@@ -686,6 +686,7 @@
 		84E1924713699BBB008DCFC8 /* WADODownload.h in Headers */ = {isa = PBXBuildFile; fileRef = 84E191F91369966A008DCFC8 /* WADODownload.h */; };
 		84E1924813699BBB008DCFC8 /* WADODownload.m in Sources */ = {isa = PBXBuildFile; fileRef = 84E191FA1369966A008DCFC8 /* WADODownload.m */; };
 		84F453570FC3DF5400D29666 /* ILCrashReporter.framework in Copy Frameworks */ = {isa = PBXBuildFile; fileRef = ABE881440FC1444D009F5C80 /* ILCrashReporter.framework */; };
+		957480D017564D6600625F4E /* FVTiff.m in Sources */ = {isa = PBXBuildFile; fileRef = CEE73FC808F44724002A395F /* FVTiff.m */; };
 		A0344496143DE4AA003E1AFA /* DCMUSRegion.m in Sources */ = {isa = PBXBuildFile; fileRef = A085E104141E53210072BF0D /* DCMUSRegion.m */; };
 		A0344498143DE4AB003E1AFA /* DCMUSRegion.m in Sources */ = {isa = PBXBuildFile; fileRef = A085E104141E53210072BF0D /* DCMUSRegion.m */; };
 		A90202BE0B980CD60001A00B /* PluginManagerController.h in Headers */ = {isa = PBXBuildFile; fileRef = A90202BA0B980CD60001A00B /* PluginManagerController.h */; };
@@ -31653,6 +31654,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				957480D017564D6600625F4E /* FVTiff.m in Sources */,
 				59DB26FB1450787E00E78E03 /* N2Debug.mm in Sources */,
 				AB724F4F0ADE6ECB00A212A0 /* dcfilefo.cc in Sources */,
 				AB724F500ADE6ECB00A212A0 /* dcxfer.cc in Sources */,
@@ -34120,6 +34122,9 @@
 					Foundation,
 					"-framework",
 					AppKit,
+					"-ltiffOsiriX",
+					"-lvtktiff",
+					"-lvtkjpeg",
 				);
 				PRODUCT_NAME = Decompress;
 				SKIP_INSTALL = YES;
@@ -34411,6 +34416,9 @@
 					Foundation,
 					"-framework",
 					AppKit,
+					"-ltiffOsiriX",
+					"-lvtktiff",
+					"-lvtkjpeg",
 				);
 				PRODUCT_NAME = Decompress;
 				SKIP_INSTALL = YES;
@@ -34693,6 +34701,9 @@
 					Foundation,
 					"-framework",
 					AppKit,
+					"-ltiffOsiriX",
+					"-lvtktiff",
+					"-lvtkjpeg",
 				);
 				PRODUCT_NAME = Decompress;
 				SKIP_INSTALL = YES;
