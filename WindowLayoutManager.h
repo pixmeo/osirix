@@ -25,17 +25,21 @@ It is a shared class.
 //@class LayoutWindowController;
 @interface WindowLayoutManager : NSObject
 {
-	NSMutableDictionary		*_currentHangingProtocol;
-	int						IMAGEROWS, IMAGECOLUMNS;
+	NSDictionary *_currentHangingProtocol;
 }
 
-+ (id)sharedWindowLayoutManager;
-- (int) IMAGEROWS;
-- (int) IMAGECOLUMNS;
+@property( retain) NSDictionary *currentHangingProtocol;
+
++ (WindowLayoutManager*)sharedWindowLayoutManager;
+- (int) windowsRows;
+- (int) windowsColumns;
+- (int) imagesRows;
+- (int) imagesColumns;
 
 #pragma mark-
 #pragma mark hanging protocol setters and getters
 
++ (NSDictionary*) hangingProtocolForModality: (NSString*) modalities description: (NSString *) description;
 - (void) setCurrentHangingProtocolForModality: (NSString*) modality description: (NSString*) description;
 - (NSDictionary*) currentHangingProtocol;
 

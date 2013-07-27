@@ -181,7 +181,7 @@
 	<key>CFBundleName</key>
 	<string>OsiriX</string>
 	<key>CFBundleGetInfoString</key>
-	<string>OsiriX v.5.6</string>
+	<string>OsiriX v.5.7</string>
 	<key>CFBundleIconFile</key>
 	<string>Osirix.icns</string>
 	<key>CFBundleIdentifier</key>
@@ -191,7 +191,7 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>5.6</string>
+	<string>5.7</string>
 	<key>CFBundleSignature</key>
 	<string>OsiX</string>
 	<key>CFBundleURLTypes</key>
@@ -210,7 +210,7 @@
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>20130221</string>
+	<string>20130726</string>
 	<key>LSCanProvideIMVideoDataSource</key>
 	<string>Yes</string>
 	<key>LSRequiresNativeExecution</key>
@@ -254,6 +254,6 @@
 	<key>NSContactsUsageDescription</key>
 	<string>Your account will be used for the built-in iChat sharing service. If you don&apos;t allow access, you cannot use the iChat functions.</string>
 	<key>GitHash</key>
-	<string>2f751490e561a5abab90f201d8b03ae9fbd98711</string>
+	<string>d946b283a7104f4e164227103ee90ec6091da3d4</string>
 </dict>
 </plist>

@@ -597,11 +597,18 @@ return YES;
 	}
 	else if( [item action] == @selector(groupSelectedROIs:))
 	{
-		if( [self selectedROI]) valid = YES;
+		if( [[self selectedROIs] count] > 1) valid = YES;
 	}
 	else if( [item action] == @selector(ungroupSelectedROIs:))
 	{
-		if( [self selectedROI]) valid = YES;
+		for( ROI *r in [roiList[ curMovieIndex] objectAtIndex: [imageView curImage]])
+		{
+			if( r.groupID)
+			{
+				valid = YES;
+				break;
+			}
+		}
 	}
 	else if( [item action] == @selector(lockSelectedROIs:))
 	{
@@ -1175,6 +1182,9 @@ static volatile int numberOfThreadsForRelisce = 0;
 	register int i = [[dict valueForKey:@"i"] intValue];
 	register int sign = [[dict valueForKey:@"sign"] intValue];
 	register int newX = [[dict valueForKey:@"newX"] intValue];
+    int newY = [[dict valueForKey:@"newY"] intValue];
+    BOOL square = [[dict valueForKey:@"square"] boolValue];
+    DCMPix *curPix = [dict valueForKey:@"curPix"];
 	register float *restrict curPixFImage = [[dict valueForKey:@"curPix"] fImage];
 	register int rowBytes = [[dict valueForKey:@"rowBytes"] intValue] / 4;
 	register int j = [[dict valueForKey:@"curMovieIndex"] intValue];
@@ -1226,7 +1236,24 @@ static volatile int numberOfThreadsForRelisce = 0;
 			}
 		}
 	}
-
+    
+    if( square)
+    {
+        vImage_Buffer	srcVimage, dstVimage;
+        
+        srcVimage.data = [curPix fImage];
+        srcVimage.height =  [pixList[ j] count];
+        srcVimage.width = newX;
+        srcVimage.rowBytes = newX*4;
+        
+        dstVimage.data = [curPix fImage];
+        dstVimage.height =  newY;
+        dstVimage.width = newX;
+        dstVimage.rowBytes = newX*4;
+        
+        vImageScale_PlanarF( &srcVimage, &dstVimage, nil, kvImageHighQualityResampling);
+    }
+    
 	[processorsLock lock];
 	if( numberOfThreadsForRelisce >= 0) numberOfThreadsForRelisce--;
 	[processorsLock unlockWithCondition: 1];
@@ -1248,6 +1275,9 @@ static volatile int numberOfThreadsForRelisce = 0;
 	NSString			*previousCLUT = [curCLUTMenu retain];
 	NSString			*previousOpacity = [curOpacityMenu retain];
 	
+    if( [pixList[ curMovieIndex] count] < 100)
+        square = YES;
+    
 	// Get Values
 	if( directionm == 0)		// X - RESLICE
 	{
@@ -1336,6 +1366,25 @@ static volatile int numberOfThreadsForRelisce = 0;
 			
 			NSLog( @"reslice start");
 			
+#ifdef VIMAGEYRESLICE
+            if( directionm)
+            {
+                vImage_Buffer src;
+                vImage_Buffer dst;
+                
+                src.height = firstPix.pheight * newY;
+                src.width = firstPix.pwidth;
+                src.rowBytes = src.width*4;
+                src.data = firstPix.fImage;
+                
+                dst.width = firstPix.pheight * newY;
+                dst.height = firstPix.pwidth;
+                dst.rowBytes = dst.width*4;
+                dst.data = emptyData;
+                
+                vImageRotate90_PlanarF( &src, &dst, kRotate270DegreesClockwise, 0, 0);
+            }
+#endif
 			for( i = 0 ; i < newTotal; i ++)
 			{
 				[newPixList addObject: [[[pixList[ j] objectAtIndex: 0] copy] autorelease]];
@@ -1411,20 +1460,6 @@ static volatile int numberOfThreadsForRelisce = 0;
 						dstVimage.rowBytes = newX*4;
 						
 						vImageScale_PlanarF( &srcVimage, &dstVimage, nil, kvImageHighQualityResampling);
-												
-	//						for( x = 0; x < newX; x++)
-	//						{
-	//							srcPtr = [curPix fImage] + x ;
-	//							
-	//							for( y = newY-1; y >= 0; y--)
-	//							{
-	//								s = y / ratio;
-	//								left = s - floor(s);
-	//								right = 1-left;
-	//								
-	//								*(srcPtr + y * rowBytes) = right * *(srcPtr + (long) (s) * rowBytes) + left * *(srcPtr + (long) ((s)+1) * rowBytes);
-	//							}
-	//						}
 					}
 					
 					[lastPix orientationDouble: orientation];
@@ -1457,58 +1492,13 @@ static volatile int numberOfThreadsForRelisce = 0;
 					DCMPix	*curPix = [newPixList lastObject];
 					long	rowBytes = [firstPix pwidth]*4;
 					
+#ifndef VIMAGEYRESLICE
 					[self waitForAProcessor];
 					
-					[NSThread detachNewThreadSelector: @selector(resliceThread:) toTarget:self withObject: [NSDictionary dictionaryWithObjectsAndKeys: [NSNumber numberWithInt: i], @"i", [NSNumber numberWithInt: sign], @"sign", [NSNumber numberWithInt: newX], @"newX",[NSNumber numberWithInt: rowBytes], @"rowBytes", curPix, @"curPix", [NSNumber numberWithInt: j], @"curMovieIndex", nil]];
-					
-	//				for(x = 0; x < [pixList[ curMovieIndex] count]; x++)
-	//				{
-	//					if( sign > 0)
-	//						srcPtr = [[pixList[ curMovieIndex] objectAtIndex: [pixList[ curMovieIndex] count]-x-1] fImage] + i;
-	//					else
-	//						srcPtr = [[pixList[ curMovieIndex] objectAtIndex: x] fImage] + i;
-	//					dstPtr = [curPix fImage] + x * newX;
-	//					
-	//					y = newX;
-	//					while (y-->0)
-	//					{
-	//						*dstPtr = *srcPtr;
-	//						dstPtr++;
-	//						srcPtr += rowBytes/4;
-	//					}
-	//				}
-										
-					if( square)
-					{
-						vImage_Buffer	srcVimage, dstVimage;
-						
-						srcVimage.data = [curPix fImage];
-						srcVimage.height =  [pixList[ j] count];
-						srcVimage.width = newX;
-						srcVimage.rowBytes = newX*4;
-						
-						dstVimage.data = [curPix fImage];
-						dstVimage.height =  newY;
-						dstVimage.width = newX;
-						dstVimage.rowBytes = newX*4;
-						
-						vImageScale_PlanarF( &srcVimage, &dstVimage, nil, kvImageHighQualityResampling);
-						
-	//						for( x = 0; x < newX; x++)
-	//						{
-	//							srcPtr = [curPix fImage] + x ;
-	//							
-	//							for( y = newY-1; y >= 0; y--)
-	//							{
-	//								s = y / ratio;
-	//								left = s - floor(s);
-	//								right = 1-left;
-	//								
-	//								*(srcPtr + y * rowBytes/4) = right * *(srcPtr + (long) (s) * rowBytes/4) + left * *(srcPtr + (long) ((s)+1) * rowBytes/4);
-	//							}
-	//						}
-					}
-					
+                    NSDictionary *d = [NSDictionary dictionaryWithObjectsAndKeys: @(i), @"i", @(sign), @"sign", @(newX), @"newX", @(newY), @"newY", @(square), @"square", [NSNumber numberWithInt: rowBytes], @"rowBytes", curPix, @"curPix", @(j), @"curMovieIndex", nil];
+                    
+                    [NSThread detachNewThreadSelector: @selector(resliceThread:) toTarget:self withObject: d];
+#endif 
 					[lastPix orientationDouble: orientation];
 					
 					// Y Vector = Normal Vector
@@ -7655,13 +7645,8 @@ return YES;
                     // default protocol
                     [[WindowLayoutManager sharedWindowLayoutManager] setCurrentHangingProtocolForModality:[study valueForKey:@"modality"] description:[study valueForKey:@"studyName"]];
                     
-                    NSDictionary *currentHangingProtocol = [[WindowLayoutManager sharedWindowLayoutManager] currentHangingProtocol];
-                    
-                    if( currentHangingProtocol)
-                    {
-                        newColumns = [[currentHangingProtocol valueForKey: @"Image Columns"] intValue];
-                        newRows = [[currentHangingProtocol valueForKey: @"Image Rows"] intValue];
-                    }
+                    newColumns = [[WindowLayoutManager sharedWindowLayoutManager] imagesColumns];
+                    newRows = [[WindowLayoutManager sharedWindowLayoutManager] imagesRows];
                     
                     // is there a windows state?
                     

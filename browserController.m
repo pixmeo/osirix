@@ -6676,13 +6676,15 @@ static NSConditionLock *threadLock = nil;
 	}
 	else	// STUDY - Hanging Protocols - Windows State
 	{
-        [self checkIfLocalStudyHasMoreOrSameNumberOfImagesOfADistantStudy: [NSArray arrayWithObject: item]];
+        DicomStudy *currentStudy = (DicomStudy*) item;
+        
+        [self checkIfLocalStudyHasMoreOrSameNumberOfImagesOfADistantStudy: [NSArray arrayWithObject: currentStudy]];
         
 		BOOL windowsStateApplied = NO;
 		
-		if( [item valueForKey:@"windowsState"] && [[NSUserDefaults standardUserDefaults] boolForKey:@"automaticWorkspaceLoad"])
+		if( [currentStudy valueForKey:@"windowsState"] && [[NSUserDefaults standardUserDefaults] boolForKey:@"automaticWorkspaceLoad"])
 		{
-			NSArray *viewers = [NSPropertyListSerialization propertyListFromData: [item valueForKey:@"windowsState"] mutabilityOption: NSPropertyListImmutable format: nil errorDescription: nil];
+			NSArray *viewers = [NSPropertyListSerialization propertyListFromData: [currentStudy valueForKey:@"windowsState"] mutabilityOption: NSPropertyListImmutable format: nil errorDescription: nil];
 			
 			NSMutableArray *seriesToOpen =  [NSMutableArray array];
 			NSMutableArray *viewersToLoad = [NSMutableArray array];
@@ -6722,7 +6724,7 @@ static NSConditionLock *threadLock = nil;
 							}
 							else
 							{
-								if( [[[seriesArray objectAtIndex: 0] valueForKeyPath:@"study.patientUID"] compare: [item valueForKey: @"patientUID"] options: NSCaseInsensitiveSearch | NSDiacriticInsensitiveSearch | NSWidthInsensitiveSearch] == NSOrderedSame)
+								if( [[[seriesArray objectAtIndex: 0] valueForKeyPath:@"study.patientUID"] compare: [currentStudy valueForKey: @"patientUID"] options: NSCaseInsensitiveSearch | NSDiacriticInsensitiveSearch | NSWidthInsensitiveSearch] == NSOrderedSame)
 								{
 									if( seriesForThisViewer == nil)
 									{
@@ -6735,7 +6737,7 @@ static NSConditionLock *threadLock = nil;
 									[seriesForThisViewer addObject: [seriesArray objectAtIndex: 0]];
 								}
 								else
-									NSLog(@"%@ versus %@", [[seriesArray objectAtIndex: 0] valueForKeyPath:@"study.patientUID"], [item valueForKey: @"patientUID"]);
+									NSLog(@"%@ versus %@", [[seriesArray objectAtIndex: 0] valueForKeyPath:@"study.patientUID"], [currentStudy valueForKey: @"patientUID"]);
 							}
 						}
 					}
@@ -6837,11 +6839,11 @@ static NSConditionLock *threadLock = nil;
 		
 		if( windowsStateApplied == NO)
 		{
-			[[WindowLayoutManager sharedWindowLayoutManager] setCurrentHangingProtocolForModality:[item valueForKey:@"modality"] description:[item valueForKey:@"studyName"]];
+			[[WindowLayoutManager sharedWindowLayoutManager] setCurrentHangingProtocolForModality:[currentStudy valueForKey:@"modality"] description:[currentStudy valueForKey:@"studyName"]];
 			
 			NSDictionary *currentHangingProtocol = [[WindowLayoutManager sharedWindowLayoutManager] currentHangingProtocol];
 			
-			NSMutableArray *children = [NSMutableArray arrayWithArray: [self childrenArray: item]];
+			NSMutableArray *children = [NSMutableArray arrayWithArray: [self childrenArray: currentStudy]];
 			
 			//Remove the series that are already displayed
 			int alreadyDisplayed = 0;
@@ -6856,28 +6858,210 @@ static NSConditionLock *threadLock = nil;
 			
 			if( alreadyDisplayed == 0)
 			{
-				if ([[currentHangingProtocol objectForKey:@"Rows"] intValue] * [[currentHangingProtocol objectForKey:@"Columns"] intValue] >= [[item valueForKey:@"imageSeries"] count])
-				{
-					[self viewerDICOMInt :NO  dcmFile:[self childrenArray: item] viewer:nil];
-				}
-				else
-				{
-					unsigned count = [[currentHangingProtocol objectForKey:@"Rows"] intValue] * [[currentHangingProtocol objectForKey:@"Columns"] intValue];
-					if( count < 1) count = 1;
-					
-					NSMutableArray *children =  [NSMutableArray array];
-					
-					for ( int i = 0; i < count; i++)
-                        [children addObject: [[self childrenArray: item] objectAtIndex:i]];
-					
-					[self viewerDICOMInt :NO  dcmFile:children viewer:nil];
-				}
+                NSMutableArray *seriesArray = nil;
+                
+                if( [[currentStudy imageSeriesContainingPixels: YES] count])
+                    seriesArray = [NSMutableArray arrayWithArray: [currentStudy imageSeriesContainingPixels: YES]];
+                else
+                    seriesArray = [NSMutableArray arrayWithArray: [currentStudy imageSeries]];
+                
+                // Prepare the series to be displayed
+                if( [[currentHangingProtocol valueForKey: @"Comparative"] boolValue])
+                {
+                    NSMutableArray *comparatives = [NSMutableArray array];
+                    
+                    // Find the previous studies
+                    int numberOfComparative = [[currentHangingProtocol valueForKey:@"NumberOfComparativeToDisplay"] intValue];
+                    
+                    //PreviousStudySameModality , PreviousStudySameDescription
+                    
+                    for( id s in [NSArray arrayWithArray: self.comparativeStudies])
+                    {
+                        id comparativeStudy = nil;
+                        
+    #ifndef OSIRIX_LIGHT
+                        if( [s isKindOfClass: [DCMTKStudyQueryNode class]])
+                        {
+                            DCMTKStudyQueryNode *study = s;
+                            
+                            if( ![[study studyInstanceUID] isEqualToString: [currentStudy valueForKey: @"studyInstanceUID"]])
+                            {
+                                comparativeStudy = study;
+                                
+                                if( [[currentHangingProtocol valueForKey:@"PreviousStudySameModality"] boolValue])
+                                {
+                                    if( [[study modality] isEqualToString: [currentStudy valueForKey: @"modality"]] == NO)
+                                        comparativeStudy = nil;
+                                }
+                                
+                                if( [[currentHangingProtocol valueForKey:@"PreviousStudySameDescription"] boolValue])
+                                {
+                                    if( [[study studyName] isEqualToString: [currentStudy valueForKey: @"studyName"]] == NO)
+                                        comparativeStudy = nil;
+                                }
+                                
+                                if( comparativeStudy)
+                                    [self retrieveComparativeStudy: comparativeStudy select: NO open: NO showGUI: NO];
+                            }
+                        }
+    #endif
+                        
+                        if( [s isKindOfClass: [DicomStudy class]])
+                        {
+                            DicomStudy *study = s;
+                            
+                            if( ![[study studyInstanceUID] isEqualToString: [currentStudy valueForKey: @"studyInstanceUID"]])
+                            {
+                                comparativeStudy = study;
+                                
+                                if( [[currentHangingProtocol valueForKey:@"PreviousStudySameModality"] boolValue])
+                                {
+                                    if( [[study modality] isEqualToString: [currentStudy valueForKey: @"modality"]] == NO)
+                                        comparativeStudy = nil;
+                                }
+                                
+                                if( [[currentHangingProtocol valueForKey:@"PreviousStudySameDescription"] boolValue])
+                                {
+                                    if( [[study studyName] isEqualToString: [currentStudy valueForKey: @"studyName"]] == NO)
+                                        comparativeStudy = nil;
+                                }
+                            }
+                        }
+                        
+                        if( comparativeStudy)
+                            [comparatives addObject: comparativeStudy];
+                        
+                        if( comparatives.count >= numberOfComparative)
+                            break;
+                    }
+                    
+    #ifndef OSIRIX_LIGHT
+                    // Wait until all distant studies are retrieved
+                    WaitRendering *w = nil;
+                    NSTimeInterval timeout = [NSDate timeIntervalSinceReferenceDate];
+                    BOOL distantStudies = NO;
+                    do
+                    {
+                        distantStudies = NO;
+                        
+                        for( int i = 0; i < comparatives.count; i++)
+                        {
+                            if( [[comparatives objectAtIndex: i] isKindOfClass: [DCMTKStudyQueryNode class]])
+                            {
+                                [NSThread sleepForTimeInterval: 0.5];
+                                
+                                [[DicomDatabase activeLocalDatabase] initiateImportFilesFromIncomingDirUnlessAlreadyImporting];
+                                
+                                NSFetchRequest *r = [NSFetchRequest fetchRequestWithEntityName: @"Study"];
+                                [r setPredicate: [NSPredicate predicateWithFormat: @"(studyInstanceUID == %@)", [[comparatives objectAtIndex: i] studyInstanceUID]]];
+                                
+                                NSArray *studyArray = nil;
+                                @try
+                                {
+                                    // We need to receive the 'messages' for the new db objects from the background thread
+                                    [[NSRunLoop currentRunLoop] runUntilDate: [NSDate dateWithTimeIntervalSinceNow: 0.5]];
+                                    
+                                    studyArray = [self.database.managedObjectContext executeFetchRequest: r error: nil];
+                                }
+                                @catch (NSException *e) { N2LogExceptionWithStackTrace(e);}
+                                
+                                if( [[[studyArray lastObject] imageSeriesContainingPixels: YES] count]) // We want images !
+                                    [comparatives replaceObjectAtIndex: i withObject: [studyArray lastObject]];
+                                else
+                                    distantStudies = YES;
+                            }
+                        }
+                        
+                        if( distantStudies && w == nil)
+                        {
+                            w = [[[WaitRendering alloc] init: NSLocalizedString(@"Retrieving...", nil)] autorelease];
+                            [w showWindow: self];
+                        }
+                    }
+    #define TIMEOUT 30
+                    while ( distantStudies && [NSDate timeIntervalSinceReferenceDate] - timeout < TIMEOUT);
+                    
+                    [w close];
+    #endif
+                    for( int i = 0; i < comparatives.count; i++)
+                    {
+                        if( [[comparatives objectAtIndex: i] isKindOfClass: [DicomStudy class]] == NO)
+                        {
+                            [comparatives removeObjectAtIndex: i];
+                            i--;
+                        }
+                    }
+                    
+                    // Prepare the series
+                    int total = [[WindowLayoutManager sharedWindowLayoutManager] windowsRows] * [[WindowLayoutManager sharedWindowLayoutManager] windowsColumns];
+                    
+                    if( seriesArray.count > total)
+                        [seriesArray removeObjectsInRange: NSMakeRange( total, seriesArray.count-total)];
+                    
+                    if( seriesArray.count + comparatives.count > total)
+                    {
+                        while( seriesArray.count - comparatives.count < 1)
+                            [comparatives removeLastObject];
+                        
+                        while( seriesArray.count + comparatives.count > total)
+                            [seriesArray removeLastObject];
+                    }
+                    
+                    [seriesArray addObjectsFromArray: comparatives];
+                }
+                
+                // Go to the series level, if we are at study level (comparatives)
+                for( int i = 0; i < seriesArray.count; i++)
+                {
+                    if( [[seriesArray objectAtIndex: i] isKindOfClass: [DicomStudy class]])
+                    {
+                        DicomStudy *s = [seriesArray objectAtIndex: i];
+                        
+                        if( [[s imageSeriesContainingPixels: YES] count])
+                        {
+                            [seriesArray replaceObjectAtIndex: i withObject: [[s imageSeriesContainingPixels: YES] objectAtIndex: 0]];
+                        }
+                        else if( [[s imageSeries] count])
+                        {
+                            [seriesArray replaceObjectAtIndex: i withObject: [[s imageSeries] objectAtIndex: 0]];
+                        }
+                        else
+                        {
+                            NSLog( @"---- no imageSeries in this study?: %@", s);
+                        }
+                    }
+                }
+            
+				[self viewerDICOMInt: NO  dcmFile: seriesArray viewer: nil];
 			}
 			else
 			{
 				for( ViewerController *v in [ViewerController getDisplayed2DViewers])
 					[[v window] makeKeyAndOrderFront: self];
 			}
+            
+            // Apply WL/WW
+            for( ViewerController *v in [ViewerController getDisplayed2DViewers])
+            {
+                NSDictionary *p = [WindowLayoutManager hangingProtocolForModality: v.modality description: v.currentStudy.studyName];
+                
+                if( p)
+                {
+                    if( [[p valueForKey: @"WL"] intValue] == 0 && [[p valueForKey: @"WW"] intValue] == 0) // Default
+                    {
+                    }
+                    
+                    else if( [[p valueForKey: @"WL"] intValue] == 1 && [[p valueForKey: @"WW"] intValue] == 1) // Full
+                    {
+                        [v.imageView setWLWW: 0 : 0];
+                    }
+                    
+                    else if( [p valueForKey: @"WL"] && [p valueForKey: @"WW"])
+                    {
+                        [v.imageView setWLWW: [[p valueForKey: @"WL"] floatValue] :[[p valueForKey: @"WW"] floatValue]];
+                    }
+                }
+            }
 		}
 	}
 }

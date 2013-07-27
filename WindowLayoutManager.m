@@ -27,12 +27,16 @@
 #import "EndoscopyViewer.h"
 #import "PlaceholderWindowController.h"
 #import "OrthogonalMPRPETCTViewer.h"
+#import "N2Debug.h"
 
 static WindowLayoutManager *sharedLayoutManager = nil;
 
 @implementation WindowLayoutManager
 
-+ (id)sharedWindowLayoutManager{
+@synthesize currentHangingProtocol = _currentHangingProtocol;
+
++ (WindowLayoutManager*)sharedWindowLayoutManager
+{
 	if (!sharedLayoutManager)
 		sharedLayoutManager = [[WindowLayoutManager alloc] init];
 	return sharedLayoutManager;
@@ -42,35 +46,82 @@ static WindowLayoutManager *sharedLayoutManager = nil;
 {
 	if (self = [super init])
 	{
-//		_windowControllers = [[NSMutableArray alloc] init];
-//		_hangingProtocolInUse = NO;
-//		_seriesSetIndex = 0;
-		
-		IMAGEROWS = 1;
-		IMAGECOLUMNS = 1;
 	}
 	return self;
 }
 
-- (int) IMAGEROWS
+- (int) windowsRows
 {
-	return IMAGEROWS;
+    if( [self.currentHangingProtocol objectForKey: @"WindowsTiling"])
+    {
+        int tag = [[self.currentHangingProtocol objectForKey: @"WindowsTiling"] intValue];
+        
+        if (tag < 16)
+            return (tag / 4) + 1; // See SetImageTiling ViewerController.m
+    }
+    
+	if( [[self.currentHangingProtocol objectForKey: @"Rows"] intValue] > 0)
+        return [[self.currentHangingProtocol objectForKey: @"Rows"] intValue];
+    
+    return 1;
 }
 
-- (int) IMAGECOLUMNS
+- (int) windowsColumns
 {
-	return IMAGECOLUMNS;
+    if( [self.currentHangingProtocol objectForKey: @"WindowsTiling"])
+    {
+        int tag = [[self.currentHangingProtocol objectForKey: @"WindowsTiling"] intValue];
+        
+        if (tag < 16)
+            return (tag %  4) + 1; // See SetImageTiling ViewerController.m
+    }
+    
+	if( [[self.currentHangingProtocol objectForKey: @"Columns"] intValue] > 0)
+        return [[self.currentHangingProtocol objectForKey: @"Columns"] intValue];
+    
+	return 1;
+}
+
+- (int) imagesRows
+{
+    if( [self.currentHangingProtocol objectForKey: @"ImageTiling"])
+    {
+        int tag = [[self.currentHangingProtocol objectForKey: @"ImageTiling"] intValue];
+        
+        if (tag < 16)
+            return (tag / 4) + 1; // See SetImageTiling ViewerController.m
+    }
+    
+	if( [[self.currentHangingProtocol objectForKey: @"Image Rows"] intValue] > 0)
+        return [[self.currentHangingProtocol objectForKey: @"Image Rows"] intValue];
+    
+    return 1;
+}
+
+- (int) imagesColumns
+{
+    if( [self.currentHangingProtocol objectForKey: @"ImageTiling"])
+    {
+        int tag = [[self.currentHangingProtocol objectForKey: @"ImageTiling"] intValue];
+        
+        if (tag < 16)
+            return (tag %  4) + 1; // See SetImageTiling ViewerController.m
+    }
+    
+	if( [[self.currentHangingProtocol objectForKey: @"Image Columns"] intValue] > 0)
+        return [[self.currentHangingProtocol objectForKey: @"Image Columns"] intValue];
+    
+	return 1;
 }
 
 #pragma mark-
 #pragma mark hanging protocol setters and getters
-- (void) setCurrentHangingProtocolForModality: (NSString *) modalities description: (NSString *) description
+
++ (NSDictionary*) hangingProtocolForModality: (NSString*) modalities description: (NSString *) description
 {
 	// if no modalities set to 1 row and 1 column
 	if ( !modalities)
 	{
-		IMAGECOLUMNS = 1;
-		IMAGEROWS = 1;
 	}
 	else
 	{
@@ -85,55 +136,42 @@ static WindowLayoutManager *sharedLayoutManager = nil;
             }
         }
         
-		if ([hangingProtocolArray count] > 0)
+		if( [hangingProtocolArray count] > 0)
 		{
-			[_currentHangingProtocol release];
-			_currentHangingProtocol = nil;
-			_currentHangingProtocol = [hangingProtocolArray objectAtIndex:0];
-			
 			@try
 			{
-				IMAGEROWS = [[_currentHangingProtocol objectForKey: @"Image Rows"] intValue];
-				IMAGECOLUMNS =  [[_currentHangingProtocol objectForKey: @"Image Columns"] intValue];
-				
-				NSMutableDictionary *protocol;
-				for (protocol in hangingProtocolArray)
+                NSDictionary *foundProtocol = [hangingProtocolArray objectAtIndex: 0]; //First one is the default protocol
+                
+				for( NSDictionary *protocol in hangingProtocolArray)
 				{
 					if( [[protocol objectForKey: @"Study Description"] isKindOfClass: [NSString class]])
 					{
 						NSRange searchRange = [description rangeOfString:[protocol objectForKey: @"Study Description"] options: NSCaseInsensitiveSearch | NSLiteralSearch];
 						if (searchRange.location != NSNotFound)
-						{
-							_currentHangingProtocol = protocol;
-							
-							IMAGEROWS = [[_currentHangingProtocol objectForKey: @"Image Rows"] intValue];
-							IMAGECOLUMNS =  [[_currentHangingProtocol objectForKey: @"Image Columns"] intValue];
-							
-							break;
-						}
+							foundProtocol = protocol;
 					}
 				}
+                
+                return foundProtocol;
 			}
-			@catch (NSException *e)
-			{
-				NSLog( @"setCurrentHangingProtocolForModality exception : %@", e);
-				IMAGEROWS = 1;
-				IMAGECOLUMNS = 1;
+			@catch (NSException *e) {
+				N2LogException( e);
 			}
-			
-			if( IMAGEROWS < 1) IMAGEROWS = 1;
-			if( IMAGECOLUMNS < 1) IMAGECOLUMNS = 1;
-			
-			[_currentHangingProtocol retain];
 		}
 	}
 	
+    return nil;
 }
 
-
-- (NSDictionary *) currentHangingProtocol
+- (void) setCurrentHangingProtocolForModality: (NSString *) modalities description: (NSString *) description
 {
-	return _currentHangingProtocol;
+    self.currentHangingProtocol = [WindowLayoutManager hangingProtocolForModality: modalities description: description];
+}
+
+- (void) dealloc
+{
+    self.currentHangingProtocol = nil;
+    [super dealloc];
 }
 
 @end
