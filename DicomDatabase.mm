@@ -1452,12 +1452,22 @@ NSString* const DicomDatabaseLogEntryEntityName = @"LogEntry";
 	return [self addFilesAtPaths:paths postNotifications:postNotifications dicomOnly:dicomOnly rereadExistingItems:rereadExistingItems generatedByOsiriX:NO];
 }
 
+-(NSArray*)addFilesAtPaths:(NSArray*)paths postNotifications:(BOOL)postNotifications dicomOnly:(BOOL)dicomOnly rereadExistingItems:(BOOL)rereadExistingItems sourcePaths:(NSDictionary*)sourcePaths
+{
+	return [self addFilesAtPaths:paths postNotifications:postNotifications dicomOnly:dicomOnly rereadExistingItems:rereadExistingItems generatedByOsiriX:NO returnArray: YES sourcePaths:sourcePaths];
+}
+
 -(NSArray*)addFilesAtPaths:(NSArray*)paths postNotifications:(BOOL)postNotifications dicomOnly:(BOOL)dicomOnly rereadExistingItems:(BOOL)rereadExistingItems generatedByOsiriX:(BOOL)generatedByOsiriX
 {
-    return [self addFilesAtPaths: paths postNotifications:postNotifications dicomOnly:dicomOnly rereadExistingItems:rereadExistingItems generatedByOsiriX:generatedByOsiriX returnArray: YES];
+    return [self addFilesAtPaths: paths postNotifications:postNotifications dicomOnly:dicomOnly rereadExistingItems:rereadExistingItems generatedByOsiriX:generatedByOsiriX returnArray: YES sourcePaths:nil];
 }
 
 -(NSArray*)addFilesAtPaths:(NSArray*)paths postNotifications:(BOOL)postNotifications dicomOnly:(BOOL)dicomOnly rereadExistingItems:(BOOL)rereadExistingItems generatedByOsiriX:(BOOL)generatedByOsiriX returnArray: (BOOL) returnArray
+{
+    return [self addFilesAtPaths: paths postNotifications:postNotifications dicomOnly:dicomOnly rereadExistingItems:rereadExistingItems generatedByOsiriX:generatedByOsiriX returnArray: returnArray sourcePaths:nil];
+}
+
+-(NSArray*)addFilesAtPaths:(NSArray*)paths postNotifications:(BOOL)postNotifications dicomOnly:(BOOL)dicomOnly rereadExistingItems:(BOOL)rereadExistingItems generatedByOsiriX:(BOOL)generatedByOsiriX returnArray:(BOOL)returnArray sourcePaths:(NSDictionary*)sourcePaths
 {
 	NSThread* thread = [NSThread currentThread];
     
@@ -1478,6 +1488,9 @@ NSString* const DicomDatabaseLogEntryEntityName = @"LogEntry";
     if( returnArray)
         retArray = [NSMutableArray array];
     
+    if (sourcePaths == nil)
+        sourcePaths = [NSDictionary dictionary];
+
 	NSString* errorsDirPath = self.errorsDirPath;
 	NSString* dataDirPath = self.dataDirPath;
 	NSString* reportsDirPath = self.reportsDirPath;
@@ -1523,7 +1536,7 @@ NSString* const DicomDatabaseLogEntryEntityName = @"LogEntry";
 #ifdef RANDOMFILES
 					curFile = [[DicomFile alloc] initRandom];
 #else
-					curFile = [[DicomFile alloc] init:newFile];
+					curFile = [[DicomFile alloc] init:newFile sourcePath:[sourcePaths objectForKey:newFile]];
 #endif
 				} @catch (NSException* e)
                 {
@@ -2497,6 +2510,8 @@ static BOOL protectionAgainstReentry = NO;
     __block BOOL studySelected = NO;
 	NSArray *filesInput = [[dict objectForKey: @"filesInput"] sortedArrayUsingSelector:@selector(compare:)]; // sorting the array should make the data access faster on optical media
 	
+	NSMutableDictionary *sourcePaths = [NSMutableDictionary dictionaryWithCapacity:[filesInput count]];
+
 //	int total = 0;
 	
 	for( int i = 0; i < [filesInput count];)
@@ -2532,6 +2547,9 @@ static BOOL protectionAgainstReentry = NO;
 					
 					dstPath = [self uniquePathForNewDataFileWithExtension:extension];
                     
+                    if ([DicomFile preserveSourceName:extension])
+                        [sourcePaths setObject:srcPath forKey:dstPath];
+
                     //We want an atomic copy: use a temp path for copy, then rename
                     
                     NSString *tempDstPath = [dstPath stringByAppendingPathExtension:@"temp"];
@@ -2630,7 +2648,7 @@ static BOOL protectionAgainstReentry = NO;
                     
                     DicomDatabase *idatabase = self.isMainDatabase? self.independentDatabase : [self.mainDatabase independentDatabase];
                     
-                    objects = [idatabase addFilesAtPaths:copiedFiles postNotifications:YES dicomOnly:onlyDICOM rereadExistingItems:YES];
+                    objects = [idatabase addFilesAtPaths:copiedFiles postNotifications:YES dicomOnly:onlyDICOM rereadExistingItems:YES sourcePaths:sourcePaths];
                     
                     DicomDatabase* mdatabase = self.isMainDatabase? self : self.mainDatabase;
                     if( [[BrowserController currentBrowser] database] == mdatabase && [[dict objectForKey:@"addToAlbum"] boolValue])
