@@ -2017,7 +2017,7 @@ static BOOL protectionAgainstReentry = NO;
 								[seriesTable setValue:[curDict objectForKey: @"modality"] forKey:@"modality"];
 								[seriesTable setValue:[curDict objectForKey: [@"seriesNumber" stringByAppendingString:SeriesNum]] forKey:@"id"];
 								[seriesTable setValue:[curDict objectForKey: @"studyDate"] forKey:@"date"];
-								[seriesTable setValue:[curDict objectForKey: @"protocolName"] forKey:@"seriesDescription"];
+								[seriesTable setValue:[curDict objectForKey: @"seriesDescription"] forKey:@"seriesDescription"];
 								
 								// Relations
 								[seriesTable setValue:study forKey:@"study"];
