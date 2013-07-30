@@ -23,7 +23,7 @@
     NSString            *name;
     NSString            *study;
     NSString            *serie;
-    NSString            *filePath, *fileType;
+    NSString            *filePath, *fileType, *sourcePath;
     NSString            *Modality;
 	NSString			*SOPUID;
 	NSString			*imageType;
@@ -48,6 +48,9 @@
 // file functions
 + (BOOL) isTiffFile:(NSString *) file; /**< Test for TIFF file format */
 + (BOOL) isFVTiffFile:(NSString *) file; /**< Test for FV TIFF file format */
++ (BOOL) isStaticImageFile:(NSString *) extension;
++ (BOOL) isMovieFile:(NSString *) extension;
++ (BOOL) preserveSourceName:(NSString *) extension;
 + (BOOL) isDICOMFile:(NSString *) file; /**< Test for DICOM file format */
 + (BOOL) isDICOMFile:(NSString *) file compressed:(BOOL*) compressed; /**< Test for DICOM file format, returns YES for compressed BOOL if Transfer syntax is compressed. */
 + (BOOL) isDICOMFile:(NSString *) file compressed:(BOOL*) compressed image:(BOOL*) image;
@@ -75,7 +78,9 @@
 - (long) getHeight; /**< Return image Height */
 - (long) NoOfSeries; /**< Returns number of seris in the file */
 - (id) init:(NSString*) f; /**< Init with file at location NSString* f */
+- (id) init:(NSString*) f sourcePath:(NSString*) s; /**< Init with file at location NSString* f providing source file path*/
 - (id) init:(NSString*) f DICOMOnly:(BOOL) DICOMOnly; /**< init with file at location NSString* f DICOM files only if DICOMOnly = YES */
+- (id) init:(NSString*) f DICOMOnly:(BOOL) DICOMOnly sourcePath:(NSString*) s; /**< init with file at location NSString* f DICOM files only if DICOMOnly = YES providing source file path*/
 - (id) initRandom; /**< Inits and returns an empty dicomFile */
 - (id) initWithXMLDescriptor: (NSString*)pathToXMLDescriptor path:(NSString*) f; /**< Init with XMLDescriptor for information and f for image data */
 - (NSString*) patientUID; /**< Returns the patientUID */

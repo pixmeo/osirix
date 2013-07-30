@@ -1,4 +1,8 @@
-This repository contains the source code of OsiriX, the open-source DICOM Viewer.
+This repository contains a fork of the source code of OsiriX, the open-source DICOM Viewer.
+
+consulting-osirix is an adaptation of OsiriX for use by consulting radiologists, when studies from multiple institutions are common.
+
+From the original OsiriX README.txt. file:
 
 About OsiriX...
 
