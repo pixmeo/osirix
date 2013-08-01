@@ -4864,13 +4864,13 @@ static BOOL initialized = NO;
     if( screenRect.size.width/screenRect.size.height > 1.7) // 16/9 screen or more
         landscapeRatio = 2.0;
     
-    float portraitRatio = 1.0;
+    float portraitRatio = 0.9;
     
     if( screenRect.size.height/screenRect.size.width > 1.7) // 16/9 screen or more
         portraitRatio = 0.49;
     
-	int rows = [[[[WindowLayoutManager sharedWindowLayoutManager] currentHangingProtocol] objectForKey:@"Rows"] intValue];
-	int columns = [[[[WindowLayoutManager sharedWindowLayoutManager] currentHangingProtocol] objectForKey:@"Columns"] intValue];
+	int rows = [[WindowLayoutManager sharedWindowLayoutManager] windowsRows];
+	int columns = [[WindowLayoutManager sharedWindowLayoutManager] windowsColumns];
 	
 	if( [sender isKindOfClass: [NSDictionary class]])
 	{
@@ -5215,14 +5215,26 @@ static BOOL initialized = NO;
 		[keyWindow propagateSettings];
 		
 		NSDisableScreenUpdates();
-		
-		for( id v in viewersList)
+        
+		for( id v in [[viewersList reverseObjectEnumerator] allObjects])
 		{
 			if( [v isKindOfClass:[ViewerController class]])
 			{
-				[v checkBuiltMatrixPreview];
-				[v redrawToolbar]; // To avoid the drag & remove item bug - multiple windows
+                if( v != keyWindow)
+                {
+                    if( [v checkFrameSize] == YES)
+                        [v buildMatrixPreview: YES];
+                    
+                    [v redrawToolbar]; // To avoid the drag & remove item bug - multiple windows
+                }
 			}
+            
+            if( [keyWindow isKindOfClass:[ViewerController class]])
+            {
+                if( [keyWindow checkFrameSize] == YES)
+                    [keyWindow buildMatrixPreview: YES];
+                [keyWindow redrawToolbar];
+            }
 		}
 		
 		if ([[NSUserDefaults standardUserDefaults] boolForKey: @"AUTOHIDEMATRIX"])

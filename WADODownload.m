@@ -20,6 +20,7 @@
 #import "dicomFile.h"
 #import "LogManager.h"
 #import "N2Debug.h"
+#import "NSString+N2.h"
 
 @interface NSURLRequest (DummyInterface)
 + (BOOL)allowsAnyHTTPSCertificateForHost:(NSString*)host;
@@ -28,7 +29,7 @@
 
 @implementation WADODownload
 
-@synthesize _abortAssociation, showErrorMessage, countOfSuccesses, WADOGrandTotal, WADOBaseTotal;
+@synthesize _abortAssociation, showErrorMessage, countOfSuccesses, WADOGrandTotal, WADOBaseTotal, baseStatus, receivedData, totalData;
 
 + (void) errorMessage:(NSArray*) msg
 {
@@ -47,7 +48,7 @@
 	if( [httpResponse statusCode] >= 300)
 	{
 		NSLog( @"***** WADO http status code error: %d", (int) [httpResponse statusCode]);
-		NSLog( @"***** WADO URL : %@", connection);
+		NSLog( @"***** WADO URL : %@", response.URL);
 		
 		if( firstWadoErrorDisplayed == NO)
 		{
@@ -58,6 +59,8 @@
 		
 		[WADODownloadDictionary removeObjectForKey: [NSString stringWithFormat:@"%ld", (long) connection]];
 	}
+    else
+        totalData += [[httpResponse.allHeaderFields valueForKey: @"Content-Length"] longLongValue];
 }
 
 - (void)connection:(NSURLConnection *)connection didReceiveData:(NSData *)data
@@ -69,6 +72,23 @@
 		NSMutableData *d = [[WADODownloadDictionary objectForKey: [NSString stringWithFormat:@"%ld", (long) connection]] objectForKey: @"data"];
 		[d appendData: data];
 		
+        receivedData += data.length;
+        
+        if( WADOTotal == 1) // Only one file: display progress in bytes
+        {
+            if( totalData > 0)
+                [[NSThread currentThread] setProgress: (double) receivedData / (double) totalData];
+            
+            if( firstReceivedTime == 0)
+                firstReceivedTime = [NSDate timeIntervalSinceReferenceDate];
+            
+            if( [NSDate timeIntervalSinceReferenceDate] - lastStatusUpdate > 1 && [NSDate timeIntervalSinceReferenceDate] - firstReceivedTime > 2)
+            {
+                lastStatusUpdate = [NSDate timeIntervalSinceReferenceDate];
+                [NSThread currentThread].status = [NSString stringWithFormat: @"%@ - %@/s", self.baseStatus, [NSString sizeString: (double) receivedData / ([NSDate timeIntervalSinceReferenceDate] - firstReceivedTime)]];
+            }
+        }
+        
 		[pool release];
 	}
 }
@@ -117,6 +137,8 @@
 
 - (void) dealloc
 {
+    self.baseStatus = nil;
+    
     [WADODownloadDictionary release];
     WADODownloadDictionary = nil;
     
@@ -219,6 +241,8 @@
     NSMutableArray *connectionsArray = [NSMutableArray array];
     
     NSAutoreleasePool *pool = [NSAutoreleasePool new];
+    
+    self.baseStatus = [[NSThread currentThread] status];
     
     @try
     {
@@ -336,7 +360,7 @@
             if( aborted)
                 NSLog( @"------ WADO downloading ABORTED");
             else
-                NSLog( @"------ WADO downloading : %d files - finished", (int) [urlToDownload count]);
+                NSLog( @"------ WADO downloading : %d files - finished (errors: %d / total: %d)", (int) [urlToDownload count], countOfSuccesses, (int) urlToDownload.count);
         }
     }
     @catch (NSException *exception) {

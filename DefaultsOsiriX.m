@@ -809,6 +809,7 @@ static NSHost *currentHost = nil;
     [defaultValues setObject:@"1" forKey:@"CapitalizedString"];
     [defaultValues setObject:@"1" forKey:@"hasFULL32BITPIPELINE"];
     [defaultValues setObject:@"1" forKey:@"FULL32BITPIPELINE"];
+    [defaultValues setObject:@"4" forKey:@"MAXNUMBEROF32BITVIEWERS"];
     [defaultValues setObject:@"1" forKey:@"CFINDCommentsAndStatusSupport"];
     [defaultValues setObject:@"1" forKey:@"restorePasswordWebServer"];
     [defaultValues setObject:@"comment" forKey:@"commentFieldForAutoFill"];
@@ -1020,7 +1021,7 @@ static NSHost *currentHost = nil;
     [defaultValues setObject:@"1" forKey:@"SeriesListVisible"];
     [defaultValues setObject:@"1" forKey:@"RescaleDuring3DResampling"];
     [defaultValues setObject:@"1" forKey:@"listPODComparativesIn2DViewer"];
-    
+    [defaultValues setObject:@"1" forKey:@"OVERFLOWLINES"];
     [defaultValues setObject:@"1" forKey:@"allow_qr_name"];
     [defaultValues setObject:@"1" forKey:@"allow_qr_id"];
     [defaultValues setObject:@"1" forKey:@"allow_qr_accession_number"];
@@ -1083,7 +1084,7 @@ static NSHost *currentHost = nil;
     
 	for (NSString *modality in modalities)
     {
-		NSMutableDictionary *protocol = [NSDictionary dictionaryWithObjects:[NSArray arrayWithObjects: NSLocalizedString( @"Default", nil), [NSNumber numberWithInt:1], [NSNumber numberWithInt:1], nil] forKeys:[NSArray arrayWithObjects:@"Study Description", @"WindowsTiling",@"ImageTiling", nil]];
+		NSMutableDictionary *protocol = [NSDictionary dictionaryWithObjects:[NSArray arrayWithObjects: NSLocalizedString( @"Default", nil), [NSNumber numberWithInt:0], [NSNumber numberWithInt:0], nil] forKeys:[NSArray arrayWithObjects:@"Study Description", @"WindowsTiling", @"ImageTiling", nil]];
         
 		[defaultHangingProtocols setObject: [NSMutableArray arrayWithObject:protocol] forKey:modality];
 	}
