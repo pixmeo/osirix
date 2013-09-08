@@ -644,6 +644,41 @@ char* replaceBadCharacter (char* str, NSStringEncoding encoding)
 	return success;
 }
 
++ (BOOL) isStaticImageFile:(NSString *) extension
+{
+	int success =
+    [extension isEqualToString:@"tiff"] == YES ||
+    [extension isEqualToString:@"tif"] == YES ||
+    [extension isEqualToString:@"stk"] == YES ||
+    [extension isEqualToString:@"png"] == YES ||
+    [extension isEqualToString:@"jpg"] == YES ||
+    [extension isEqualToString:@"jpeg"] == YES ||
+    [extension isEqualToString:@"jp2"] == YES ||
+    [extension isEqualToString:@"pdf"] == YES ||
+    [extension isEqualToString:@"pct"] == YES ||
+    [extension isEqualToString:@"gif"] == YES;
+
+	return success;
+}
+
++ (BOOL) isMovieFile:(NSString *) extension;
+{
+	int success =
+    [extension isEqualToString:@"mov"] == YES ||
+    [extension isEqualToString:@"mpg"] == YES ||
+    [extension isEqualToString:@"mpeg"] == YES ||
+    [extension isEqualToString:@"avi"] == YES;
+
+	return success;
+}
+
++ (BOOL) preserveSourceName:(NSString *) extension
+{
+	return [DicomFile isStaticImageFile:extension] || [DicomFile isMovieFile:extension] ||
+            [extension isEqualToString:@"pic"] == YES ||
+            [extension isEqualToString:@"lsm"] == YES;
+}
+
 #ifndef DECOMPRESS_APP
 + (BOOL) isNIfTIFile:(NSString *) file
 {
@@ -759,7 +794,9 @@ char* replaceBadCharacter (char* str, NSStringEncoding encoding)
 	
 	#ifndef STATIC_DICOM_LIB
 	#ifndef OSIRIX_LIGHT
-	NSString *extension = [[filePath pathExtension] lowercaseString];
+	NSString *extension = [[sourcePath pathExtension] lowercaseString];
+    NSString *sourceFileName = [sourcePath lastPathComponent];
+    NSString *fileNameRoot = [[NSString alloc] initWithString:[sourceFileName stringByDeletingPathExtension]];
 	
 	if( [extension isEqualToString:@"tiff"] == YES ||
 		[extension isEqualToString:@"tif"] == YES)
@@ -799,17 +836,6 @@ char* replaceBadCharacter (char* str, NSStringEncoding encoding)
 			width = w;
 			height = h;
 			
-			name = [[NSString alloc] initWithString: [filePath lastPathComponent]];
-//			name = [[NSString alloc] initWithCString:mm_head.Name encoding:NSWindowsCP1252StringEncoding];
-			patientID = [[NSString alloc] initWithString:name];
-			studyID = [[NSString alloc] initWithString:name];
-			self.serieID = name;
-			imageID = [[NSString alloc] initWithString:name];
-			study = [[NSString alloc] initWithString:name];
-			serie = [[NSString alloc] initWithString:name];
-			Modality = [[NSString alloc] initWithString:@"FV300"];
-			fileType = [@"FVTiff" retain];
-			
 			// set the comments and date fields
 			NSXMLElement* rootElement = [xmlDocument rootElement];
 			NSString* datetime_string = [NSString string];
@@ -829,18 +855,26 @@ char* replaceBadCharacter (char* str, NSStringEncoding encoding)
 							datetime_string = [NSString stringWithFormat:@"%@ %@", datetime_string, [theSubNode stringValue]];
 					}
 			}
-			
-			
-			date = [[NSDate dateWithNaturalLanguageString:datetime_string] retain];
-			if (date == nil)
-				date = [[[[NSFileManager defaultManager] fileAttributesAtPath:filePath traverseLink:NO ] fileCreationDate] retain];
-			if( date == nil) date = [[NSDate date] retain];
-            
+
+            imageID = [[NSString alloc] initWithString:@"0"];
+            SOPUID = [[NSString alloc] initWithString:sourceFileName];
+			self.serieID = sourceFileName;
+			studyID = [[NSString alloc] initWithString:sourceFileName];
+			patientID = [[NSString alloc] initWithString:sourceFileName];
+
+			name = [[NSString alloc] initWithString: fileNameRoot];
+            //			name = [[NSString alloc] initWithCString:mm_head.Name encoding:NSWindowsCP1252StringEncoding];
+			study = [[NSString alloc] initWithString:fileNameRoot];
+			serie = [[NSString alloc] initWithString:fileNameRoot];
+			Modality = [[NSString alloc] initWithString:@"FV300"];
+
+            date = [[[[NSFileManager defaultManager] attributesOfItemAtPath: sourcePath error: nil] fileCreationDate] retain];
+            if( date == nil) date = [[NSDate date] retain];
+			fileType = [@"FVTiff" retain];
+
 			[dicomElements setObject:studyID forKey:@"studyID"];
 			[dicomElements setObject:study forKey:@"studyDescription"];
-			
 			[dicomElements setObject:date forKey:@"studyDate"];
-			
 			[dicomElements setObject:Modality forKey:@"modality"];
 			[dicomElements setObject:patientID forKey:@"patientID"];
 			[dicomElements setObject:name forKey:@"patientName"];
@@ -854,12 +888,12 @@ char* replaceBadCharacter (char* str, NSStringEncoding encoding)
 					SeriesNum = [NSString stringWithFormat:@"%d",i];
 				else
 					SeriesNum = @"";
-								
-				[dicomElements setObject:[SeriesNum stringByAppendingString: self.serieID] forKey:[@"seriesID" stringByAppendingString:SeriesNum]];
+
+				[dicomElements setObject:[NSNumber numberWithInt: i] forKey:[@"imageID" stringByAppendingString:SeriesNum]];
+				[dicomElements setObject:[[NSString alloc] initWithFormat: @"%@-%@", imageID, SeriesNum] forKey:[@"SOPUID" stringByAppendingString:SeriesNum]];
+				[dicomElements setObject:[[NSString alloc] initWithFormat: @"%@-%@", self.serieID, SeriesNum] forKey:[@"seriesID" stringByAppendingString:SeriesNum]];
 //				[dicomElements setObject:[SeriesNum stringByAppendingString:name] forKey:[@"seriesDescription" stringByAppendingString:SeriesNum]];
 				[dicomElements setObject:[NSNumber numberWithInt: i] forKey:[@"seriesNumber" stringByAppendingString:SeriesNum]];
-				[dicomElements setObject:[imageID stringByAppendingString:SeriesNum] forKey:[@"SOPUID" stringByAppendingString:SeriesNum]];
-				[dicomElements setObject:[NSNumber numberWithInt: i] forKey:[@"imageID" stringByAppendingString:SeriesNum]];
 				
 				// seriesDescription stuff
 				int pos = i;
@@ -904,17 +938,22 @@ char* replaceBadCharacter (char* str, NSStringEncoding encoding)
 	height = 512;
 	width = 512;
 
-	imageID = [[NSString alloc] initWithString: [[NSDate date] description]];
-	self.serieID = [[NSDate date] description];
-	studyID = [[NSString alloc] initWithFormat:@"%ld", random()];
+    NSString *fileName = [filePath lastPathComponent];
+    NSString *fileNameRoot = [[NSString alloc] initWithString:[fileName stringByDeletingPathExtension]];
 
-	name = [[NSString alloc] initWithString:[filePath lastPathComponent]];
-	patientID = [[NSString alloc] initWithString:name];
-	study = [[NSString alloc] initWithString:[filePath lastPathComponent]];
+    imageID = [[NSString alloc] initWithString:@"0"];
+    SOPUID = [[NSString alloc] initWithString:fileName];
+    self.serieID = [[NSString alloc] initWithString:fileName];
+    studyID = [[NSString alloc] initWithString:fileName];
+    patientID = [[NSString alloc] initWithString:fileName];
+
+    name = [[NSString alloc] initWithString:fileNameRoot];
+    study = [[NSString alloc] initWithString:fileNameRoot];
+    serie = [[NSString alloc] initWithString:fileNameRoot];
 	Modality = [[NSString alloc] initWithString:@"RD"];
-	date = [[NSCalendarDate date] retain];
-	serie = [[NSString alloc] initWithString:[filePath lastPathComponent]];
-	fileType = [@"IMAGE" retain];
+    date = [[[[NSFileManager defaultManager] attributesOfItemAtPath: sourcePath error: nil] fileCreationDate] retain];
+    if( date == nil) date = [[NSDate date] retain];
+    fileType = [@"IMAGE" retain];
 
 	NoOfSeries = 1;
 	NoOfFrames = 1;
@@ -939,28 +978,17 @@ char* replaceBadCharacter (char* str, NSStringEncoding encoding)
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 -(short) getImageFile
 {
-	NSString	*extension = [[filePath pathExtension] lowercaseString];
+	NSString	*extension = [[sourcePath pathExtension] lowercaseString];
+    NSString    *sourceFileName = [sourcePath lastPathComponent];
 	
 	NoOfFrames = 1;
 	
 	
-	if( [extension isEqualToString:@"tiff"] == YES ||
-		[extension isEqualToString:@"tif"] == YES ||
-		[extension isEqualToString:@"stk"] == YES ||
-		[extension isEqualToString:@"png"] == YES ||
-		[extension isEqualToString:@"jpg"] == YES ||
-		[extension isEqualToString:@"jpeg"] == YES ||
-        [extension isEqualToString:@"jp2"] == YES ||
-		[extension isEqualToString:@"pdf"] == YES ||
-		[extension isEqualToString:@"pct"] == YES ||
-		[extension isEqualToString:@"gif"] == YES)
+	if([DicomFile isStaticImageFile:extension])
 		{
 			NSImage		*otherImage = [[NSImage alloc] initWithContentsOfFile:filePath];
 			if( otherImage || [extension isEqualToString:@"tiff"] || [extension isEqualToString:@"tif"])
 			{
-				// Try to identify a 2 digit number in the last part of the file.
-				char				strNo[ 5];
-				NSString			*tempString = [[filePath lastPathComponent] stringByDeletingPathExtension];
 				NSBitmapImageRep	*rep;
 				
 				#ifndef STATIC_DICOM_LIB
@@ -1014,79 +1042,7 @@ char* replaceBadCharacter (char* str, NSStringEncoding encoding)
                         height = TIFFRep.pixelsHigh;
                     }
 				}
-				
-				if( [tempString length] >= 4) strNo[ 0] = [tempString characterAtIndex: [tempString length] -4];	else strNo[ 0]= 0;
-				if( [tempString length] >= 3) strNo[ 1] = [tempString characterAtIndex: [tempString length] -3];	else strNo[ 1]= 0;
-				if( [tempString length] >= 2) strNo[ 2] = [tempString characterAtIndex: [tempString length] -2];	else strNo[ 2]= 0;
-				if( [tempString length] >= 1) strNo[ 3] = [tempString characterAtIndex: [tempString length] -1];	else strNo[ 3]= 0;
-				strNo[ 4] = 0;
-				
-				if( strNo[ 0] >= '0' && strNo[ 0] <= '9' && strNo[ 1] >= '0' && strNo[ 1] <= '9' && strNo[ 2] >= '0' && strNo[ 2] <= '9'  && strNo[ 3] >= '0' && strNo[ 3] <= '9')
-				{
-					imageID = [[NSString alloc] initWithCString: (char*) strNo encoding: NSASCIIStringEncoding];
-					SOPUID = [[NSString alloc] initWithString: [[tempString substringToIndex: [tempString length] - 4] stringByAppendingString:[NSString stringWithCString: (char*) strNo encoding: NSISOLatin1StringEncoding]]];
-					self.serieID = [tempString substringToIndex: [tempString length] - 4];
-					studyID = [[NSString alloc] initWithString: [tempString substringToIndex: [tempString length] - 4]];
-				}
-				else if( strNo[ 1] >= '0' && strNo[ 1] <= '9' && strNo[ 2] >= '0' && strNo[ 2] <= '9' && strNo[ 3] >= '0' && strNo[ 3] <= '9')
-				{
-					// We HAVE a number with 3 digit at the end of the file!! Make a serie of it!
-					
-					strNo[0] = strNo[ 1];
-					strNo[1] = strNo[ 2];
-					strNo[2] = strNo[ 3];
-					strNo[3] = 0;
-					
-					imageID = [[NSString alloc] initWithCString: (char*) strNo encoding: NSASCIIStringEncoding];
-					SOPUID = [[NSString alloc] initWithString: [[tempString substringToIndex: [tempString length] - 3] stringByAppendingString:[NSString stringWithCString: (char*) strNo encoding: NSISOLatin1StringEncoding]]];
-					self.serieID = [tempString substringToIndex: [tempString length] - 3];
-					studyID = [[NSString alloc] initWithString: [tempString substringToIndex: [tempString length] - 3]];
-				}
-				else if( strNo[ 2] >= '0' && strNo[ 2] <= '9' && strNo[ 3] >= '0' && strNo[ 3] <= '9')
-				{
-					// We HAVE a number with 2 digit at the end of the file!! Make a serie of it!
-					strNo[0] = strNo[ 2];
-					strNo[1] = strNo[ 3];
-					strNo[2] = 0;
-					
-					imageID = [[NSString alloc] initWithCString: (char*) strNo encoding: NSASCIIStringEncoding];
-					SOPUID = [[NSString alloc] initWithString: [[tempString substringToIndex: [tempString length] - 2] stringByAppendingString:[NSString stringWithCString: (char*) strNo encoding: NSISOLatin1StringEncoding]]];
-					self.serieID = [tempString substringToIndex: [tempString length] - 2];
-					studyID = [[NSString alloc] initWithString: [tempString substringToIndex: [tempString length] - 2]];
-				}
-				else if( strNo[ 3] >= '0' && strNo[ 3] <= '9')
-				{
-					// We HAVE a number with 1 digit at the end of the file!! Make a serie of it!
-					strNo[0] = strNo[ 3];
-					strNo[1] = 0;
-					
-					imageID = [[NSString alloc] initWithCString: (char*) strNo encoding: NSASCIIStringEncoding];
-					SOPUID = [[NSString alloc] initWithString: [[tempString substringToIndex: [tempString length] - 1] stringByAppendingString:[NSString stringWithCString: (char*) strNo encoding: NSISOLatin1StringEncoding]]];
-					self.serieID = [tempString substringToIndex: [tempString length] - 1];
-					studyID = [[NSString alloc] initWithString: [tempString substringToIndex: [tempString length] - 1]];
-				}
-				else
-				{
-					imageID = [[NSString alloc] initWithString:[filePath lastPathComponent]];
-					SOPUID = [[NSString alloc] initWithString:[filePath lastPathComponent]];
-					self.serieID = [filePath lastPathComponent];
-					studyID = [[NSString alloc] initWithString:[filePath lastPathComponent]];
-				}
-				
-				name = [[NSString alloc] initWithString:[filePath lastPathComponent]];
-				patientID = [[NSString alloc] initWithString:name];
-				study = [[NSString alloc] initWithString:[filePath lastPathComponent]];
-				Modality = [[NSString alloc] initWithString:extension];
-				date = [[[[NSFileManager defaultManager] attributesOfItemAtPath: filePath error: nil] fileCreationDate] retain];
-                if( date == nil) date = [[NSDate date] retain];
-				serie = [[NSString alloc] initWithString:[filePath lastPathComponent]];
-				fileType = [@"IMAGE" retain];
-				
-				if( NoOfFrames > 1) // SERIES ID MUST BE UNIQUE!!!!!
-					self.serieID = [NSString stringWithFormat:@"%@-%@-%@", self.serieID, imageID, [filePath lastPathComponent]];
-				
-				NoOfSeries = 1;
-				
+
 				if( [extension isEqualToString:@"pdf"])
 				{
 					NSPDFImageRep *pdfRepresentation = [NSPDFImageRep imageRepWithData: [NSData dataWithContentsOfFile: filePath]];
@@ -1095,6 +1051,64 @@ char* replaceBadCharacter (char* str, NSStringEncoding encoding)
 					
 					if( NoOfFrames > 50) NoOfFrames = 50;   // Limit number of pages
 				}
+
+                // In the source file name (less extension), scan for a trailing image number, if any.
+				NSCharacterSet *digits = [NSCharacterSet decimalDigitCharacterSet];
+                NSScanner *fileNameScanner = [NSScanner scannerWithString:[sourceFileName stringByDeletingPathExtension]];
+                NSInteger imageNo;
+                NSString *fileNameRoot = nil;   //source file name without extension, without appended image number, if any
+
+                // There must be at least some non-digits in the file name that has an image number appended.
+                [fileNameScanner setCharactersToBeSkipped:digits];
+                if ([fileNameScanner scanUpToCharactersFromSet:digits intoString:NULL])
+                {
+                    // Start scan from the beginning with full character set.
+                    [fileNameScanner setScanLocation:0];
+                    [fileNameScanner setCharactersToBeSkipped:nil];
+                    do
+                    {
+                        NSUInteger position = [fileNameScanner scanLocation];
+                        if ([fileNameScanner scanInteger:& imageNo] && [fileNameScanner isAtEnd] == YES)
+                        {
+                            fileNameRoot = [[fileNameScanner string] substringToIndex:position];
+                        } else
+                        {
+                            [fileNameScanner scanUpToCharactersFromSet:digits intoString:NULL];
+                        }
+                    } while ([fileNameScanner isAtEnd] == NO);
+                }
+
+				if (fileNameRoot)
+				{
+					imageID = [[NSString alloc] initWithFormat:@"%d", imageNo];
+					SOPUID = [[NSString alloc] initWithFormat:@"%@-%@-%d", fileNameRoot, extension, imageNo];
+                    self.serieID = [[NSString alloc] initWithFormat:@"%@-%@", fileNameRoot, extension];
+                    studyID = [[NSString alloc] initWithFormat:@"%@-%@", fileNameRoot, extension];
+                    patientID = [[NSString alloc] initWithFormat:@"%@-%@", fileNameRoot, extension];
+				}
+				else
+				{
+                    fileNameRoot = [[NSString alloc] initWithString:[sourceFileName stringByDeletingPathExtension]];
+
+					imageID = [[NSString alloc] initWithString:@"0"];
+					SOPUID = [[NSString alloc] initWithString:sourceFileName];
+                    self.serieID = [[NSString alloc] initWithString:sourceFileName];
+                    studyID = [[NSString alloc] initWithString:sourceFileName];
+                    patientID = [[NSString alloc] initWithString:sourceFileName];
+				}
+
+				name = [[NSString alloc] initWithString:fileNameRoot];
+				study = [[NSString alloc] initWithString:fileNameRoot];
+				serie = [[NSString alloc] initWithString:fileNameRoot];
+				Modality = [[NSString alloc] initWithString:extension];
+				date = [[[[NSFileManager defaultManager] attributesOfItemAtPath: sourcePath error: nil] fileCreationDate] retain];
+                if( date == nil) date = [[NSDate date] retain];
+				fileType = [@"IMAGE" retain];
+				
+				if( NoOfFrames > 1) // SERIES ID MUST BE UNIQUE!!!!!
+					self.serieID = [NSString stringWithFormat:@"%@-%@", self.serieID, imageID];
+				
+				NoOfSeries = 1;
 				
 				[dicomElements setObject:studyID forKey:@"studyID"];
 				[dicomElements setObject:study forKey:@"studyDescription"];
@@ -1115,26 +1129,8 @@ char* replaceBadCharacter (char* str, NSStringEncoding encoding)
 				return 0;
 			}
 	}
-	
-	if( [extension isEqualToString:@"mov"] == YES ||
-		[extension isEqualToString:@"mpg"] == YES ||
-		[extension isEqualToString:@"mpeg"] == YES ||
-		[extension isEqualToString:@"avi"] == YES)
+	else if( [DicomFile isMovieFile:extension])
     {
-        name = [[NSString alloc] initWithString:[filePath lastPathComponent]];
-        patientID = [[NSString alloc] initWithString:name];
-        studyID = [[NSString alloc] initWithString:[filePath lastPathComponent]];
-        self.serieID = [filePath lastPathComponent];
-        imageID = [[NSString alloc] initWithString:[filePath lastPathComponent]];
-        
-        
-        study = [[NSString alloc] initWithString:[filePath lastPathComponent]];
-        Modality = [[NSString alloc] initWithString:extension];
-        date = [[[[NSFileManager defaultManager] attributesOfItemAtPath:filePath error: nil] fileCreationDate] retain];
-        if( date == nil) date = [[NSDate date] retain];
-        serie = [[NSString alloc] initWithString:[filePath lastPathComponent]];
-        fileType = [@"IMAGE" retain];
-
         NoOfFrames = 1;
         NoOfSeries = 1;
         
@@ -1180,9 +1176,25 @@ char* replaceBadCharacter (char* str, NSStringEncoding encoding)
                 }
             }
         }
-        
+
         if( NoOfFrames > QUICKTIMETIMEFRAMELIMIT) NoOfFrames = QUICKTIMETIMEFRAMELIMIT;   // Limit number of images !
         
+        NSString *fileNameRoot = [[NSString alloc] initWithString:[sourceFileName stringByDeletingPathExtension]];
+
+        imageID = [[NSString alloc] initWithString:@"0"];
+        SOPUID = [[NSString alloc] initWithString:sourceFileName];
+        self.serieID = [[NSString alloc] initWithString:sourceFileName];
+        studyID = [[NSString alloc] initWithString:sourceFileName];
+        patientID = [[NSString alloc] initWithString:sourceFileName];
+
+        name = [[NSString alloc] initWithString:fileNameRoot];
+        study = [[NSString alloc] initWithString:fileNameRoot];
+        serie = [[NSString alloc] initWithString:fileNameRoot];
+        Modality = [[NSString alloc] initWithString:extension];
+        date = [[[[NSFileManager defaultManager] attributesOfItemAtPath:sourcePath error: nil] fileCreationDate] retain];
+        if( date == nil) date = [[NSDate date] retain];
+        fileType = [@"IMAGE" retain];
+
         [dicomElements setObject:studyID forKey:@"studyID"];
         [dicomElements setObject:study forKey:@"studyDescription"];
         [dicomElements setObject:date forKey:@"studyDate"];
@@ -1193,7 +1205,7 @@ char* replaceBadCharacter (char* str, NSStringEncoding encoding)
         [dicomElements setObject:self.serieID forKey:@"seriesID"];
         [dicomElements setObject:name forKey:@"seriesDescription"];
         [dicomElements setObject:[NSNumber numberWithInt: 0] forKey:@"seriesNumber"];
-        [dicomElements setObject:imageID forKey:@"SOPUID"];
+        [dicomElements setObject:SOPUID forKey:@"SOPUID"];
         [dicomElements setObject:[NSNumber numberWithInt:[imageID intValue]] forKey:@"imageID"];
         [dicomElements setObject:fileType forKey:@"fileType"];
         
@@ -1305,7 +1317,7 @@ char* replaceBadCharacter (char* str, NSStringEncoding encoding)
 	FILE					*fp;
 	struct BioradHeader		header;
 	
-	NSString	*extension = [[filePath pathExtension] lowercaseString];
+	NSString *extension = [[sourcePath pathExtension] lowercaseString];
 	
 	if( [extension isEqualToString:@"pic"] == YES)
 	{
@@ -1314,34 +1326,13 @@ char* replaceBadCharacter (char* str, NSStringEncoding encoding)
 		fp = fopen( [filePath UTF8String], "r");
 		if( fp)
 		{
-			fileType = [@"BIORAD" retain];
-			
 			fread( &header, 76, 1, fp);
-			
-			// GJ: 040609 giving better names
-			NSString	*fileNameStem = [[filePath lastPathComponent] stringByDeletingPathExtension];
-			// Biorad files _usually_ keep the channel number in the last two digits
-			
-			NSString	*imageStem = [fileNameStem substringToIndex:[fileNameStem length]-2];
-			name = [[NSString alloc] initWithString: [filePath lastPathComponent]];
-			patientID = [[NSString alloc] initWithString:name];
-			studyID = [[NSString alloc] initWithString:imageStem];
-			self.serieID = fileNameStem;
-			imageID = [[NSString alloc] initWithString:fileNameStem];
-			study = [[NSString alloc] initWithString:imageStem];
-			serie = [[NSString alloc] initWithString:fileNameStem];
-			Modality = [[NSString alloc] initWithString:@"BRP"];
-			//////////////////////////////////////////////////////////////////////////////////////
-			
+
 			short realheight = NSSwapLittleShortToHost(header.ny);
 			height = realheight;
 			short realwidth = NSSwapLittleShortToHost(header.nx);
-			width = realwidth;	
+			width = realwidth;
 			NoOfFrames = NSSwapLittleShortToHost(header.npic);
-			NoOfSeries = 1;
-			
-			date = [[[[NSFileManager defaultManager] attributesOfItemAtPath:filePath error: nil] fileCreationDate] retain];
-			if( date == nil) date = [[NSDate date] retain];
             
 			//NSLog(@"File has h x w x d %d x %d x %d",height,width,NoOfFrames);
 			int bytesPerPixel=1;
@@ -1350,9 +1341,70 @@ char* replaceBadCharacter (char* str, NSStringEncoding encoding)
 			{
 				bytesPerPixel=2;
 			}
-			
 			fclose( fp);
+
+			if( NoOfFrames == 0)
+			{
+				return -1;
+			}
+
+			NoOfSeries = 1;
+
+            NSString *sourceFileName = [sourcePath lastPathComponent];
 			
+			// Biorad files _usually_ keep the channel number in the last two digits -- scan for them
+            NSCharacterSet *digits = [NSCharacterSet decimalDigitCharacterSet];
+            NSScanner *fileNameScanner = [NSScanner scannerWithString:[sourceFileName stringByDeletingPathExtension]];
+            NSInteger imageNo;
+            NSString *fileNameRoot = nil;   //source file name without extension, without appended image number, if any
+
+            // There must be at least some non-digits in the file name that has an image number appended.
+            [fileNameScanner setCharactersToBeSkipped:digits];
+            if ([fileNameScanner scanUpToCharactersFromSet:digits intoString:NULL])
+            {
+                // Start scan from the beginning with full character set.
+                [fileNameScanner setScanLocation:0];
+                [fileNameScanner setCharactersToBeSkipped:nil];
+                do
+                {
+                    NSUInteger position = [fileNameScanner scanLocation];
+                    if ([fileNameScanner scanInteger:& imageNo] && [fileNameScanner isAtEnd] == YES)
+                    {
+                        fileNameRoot = [[fileNameScanner string] substringToIndex:position];
+                    } else
+                    {
+                        [fileNameScanner scanUpToCharactersFromSet:digits intoString:NULL];
+                    }
+                } while ([fileNameScanner isAtEnd] == NO);
+            }
+
+            if (fileNameRoot)
+            {
+                imageID = [[NSString alloc] initWithFormat:@"%d", imageNo];
+                SOPUID = [[NSString alloc] initWithFormat:@"%@-%@-%d", fileNameRoot, extension, imageNo];
+                self.serieID = [[NSString alloc] initWithFormat:@"%@-%@", fileNameRoot, extension];
+                studyID = [[NSString alloc] initWithFormat:@"%@-%@", fileNameRoot, extension];
+                patientID = [[NSString alloc] initWithFormat:@"%@-%@", fileNameRoot, extension];
+            }
+            else
+            {
+                fileNameRoot = [[NSString alloc] initWithString:[sourceFileName stringByDeletingPathExtension]];
+
+                imageID = [[NSString alloc] initWithString:@"0"];
+                SOPUID = [[NSString alloc] initWithString:sourceFileName];
+                self.serieID = [[NSString alloc] initWithString:sourceFileName];
+                studyID = [[NSString alloc] initWithString:sourceFileName];
+                patientID = [[NSString alloc] initWithString:sourceFileName];
+            }
+
+            name = [[NSString alloc] initWithString:fileNameRoot];
+            study = [[NSString alloc] initWithString:fileNameRoot];
+            serie = [[NSString alloc] initWithString:fileNameRoot];
+			Modality = [[NSString alloc] initWithString:@"BRP"];
+            date = [[[[NSFileManager defaultManager] attributesOfItemAtPath: sourcePath error: nil] fileCreationDate] retain];
+            if( date == nil) date = [[NSDate date] retain];
+			fileType = [@"BIORAD" retain];
+
 			[dicomElements setObject:studyID forKey:@"studyID"];
 			[dicomElements setObject:study forKey:@"studyDescription"];
 			[dicomElements setObject:date forKey:@"studyDate"];
@@ -1363,17 +1415,14 @@ char* replaceBadCharacter (char* str, NSStringEncoding encoding)
 			[dicomElements setObject:self.serieID forKey:@"seriesID"];
 			[dicomElements setObject:name forKey:@"seriesDescription"];
 			[dicomElements setObject:[NSNumber numberWithInt: 0] forKey:@"seriesNumber"];
-			[dicomElements setObject:imageID forKey:@"SOPUID"];
+			[dicomElements setObject:SOPUID forKey:@"SOPUID"];
 			[dicomElements setObject:[NSNumber numberWithInt:[imageID intValue]] forKey:@"imageID"];
 			[dicomElements setObject:fileType forKey:@"fileType"];
-			
-			if( name != nil && studyID != nil && self.serieID != nil && imageID != nil && NoOfFrames>0)
-			{
-				return 0;   // success
-			}
-		}
+
+            return 0;
+        }
 	}
-	
+
 	return -1;
 }
 
@@ -1383,29 +1432,17 @@ char* replaceBadCharacter (char* str, NSStringEncoding encoding)
 	const char		*ptr;
 	long		i;
 	
-	NSString	*extension = [[filePath pathExtension] lowercaseString];
+	NSString	*extension = [[sourcePath pathExtension] lowercaseString];
 	
 	if( [extension isEqualToString:@"lsm"] == YES)
 	{
 		file = [NSData dataWithContentsOfFile: filePath];
 		if( [file length] > 1)
 		{
-			fileType = [@"LSM" retain];
-			
 			ptr = [file bytes];
 			
 			if( ptr[ 2] == 42)
 				NSLog(@"LSM File");
-			
-			name = [[NSString alloc] initWithString: [filePath lastPathComponent]];
-			patientID = [[NSString alloc] initWithString:name];
-			studyID = [[NSString alloc] initWithString:name];
-			self.serieID = name;
-			imageID = [[NSString alloc] initWithString:name];
-			study = [[NSString alloc] initWithString:name];
-			serie = [[NSString alloc] initWithString:name];
-			Modality = [[NSString alloc] initWithString:@"LSM"];
-			//////////////////////////////////////////////////////////////////////////////////////
 			
 			FILE *fp = fopen([ filePath UTF8String], "r");
 			int it = 0;
@@ -1662,12 +1699,24 @@ char* replaceBadCharacter (char* str, NSStringEncoding encoding)
 			
 			fclose( fp);
 			
+            NSString *sourceFileName = [sourcePath lastPathComponent];
+            NSString *fileNameRoot = [[NSString alloc] initWithString:[sourceFileName stringByDeletingPathExtension]];
 
+            imageID = [[NSString alloc] initWithString:@"0"];
+            SOPUID = [[NSString alloc] initWithString:sourceFileName];
+			self.serieID = sourceFileName;
+			studyID = [[NSString alloc] initWithString:sourceFileName];
+			patientID = [[NSString alloc] initWithString:sourceFileName];
 
+            name = [[NSString alloc] initWithString: fileNameRoot];
+			study = [[NSString alloc] initWithString:fileNameRoot];
+			serie = [[NSString alloc] initWithString:fileNameRoot];
+			Modality = [[NSString alloc] initWithString:@"LSM"];
 
 			date = [[[[NSFileManager defaultManager] attributesOfItemAtPath: filePath error: nil] fileCreationDate] retain];
 			if( date == nil) date = [[NSDate date] retain];
-            
+			fileType = [@"LSM" retain];
+
 			[dicomElements setObject:studyID forKey:@"studyID"];
 			[dicomElements setObject:study forKey:@"studyDescription"];
 			[dicomElements setObject:date forKey:@"studyDate"];
@@ -1675,14 +1724,8 @@ char* replaceBadCharacter (char* str, NSStringEncoding encoding)
 			[dicomElements setObject:patientID forKey:@"patientID"];
 			[dicomElements setObject:name forKey:@"patientName"];
 			[dicomElements setObject:[self patientUID] forKey:@"patientUID"];
-//			[dicomElements setObject:serieID forKey:@"seriesID"];
-//			[dicomElements setObject:name forKey:@"seriesDescription"];
-//			[dicomElements setObject:[NSNumber numberWithInt: 0] forKey:@"seriesNumber"];
-//			[dicomElements setObject:imageID forKey:@"SOPUID"];
-//			[dicomElements setObject:[NSNumber numberWithInt:[imageID intValue]] forKey:@"imageID"];
 			[dicomElements setObject:fileType forKey:@"fileType"];
 			
-////////////////
 			for (i = 0; i < NoOfSeries; i++)
 			{
 				NSString* SeriesNum;
@@ -1691,17 +1734,15 @@ char* replaceBadCharacter (char* str, NSStringEncoding encoding)
 				else
 					SeriesNum = @"";
 								
-				[dicomElements setObject:[SeriesNum stringByAppendingString: self.serieID] forKey:[@"seriesID" stringByAppendingString:SeriesNum]];
-				[dicomElements setObject:[SeriesNum stringByAppendingString:name] forKey:[@"seriesDescription" stringByAppendingString:SeriesNum]];
-				[dicomElements setObject:[NSNumber numberWithInt: i] forKey:[@"seriesNumber" stringByAppendingString:SeriesNum]];
-				[dicomElements setObject:[imageID stringByAppendingString:SeriesNum] forKey:[@"SOPUID" stringByAppendingString:SeriesNum]];
 				[dicomElements setObject:[NSNumber numberWithInt: i] forKey:[@"imageID" stringByAppendingString:SeriesNum]];
+				[dicomElements setObject:[[NSString alloc] initWithFormat: @"%@-%@", imageID, SeriesNum] forKey:[@"SOPUID" stringByAppendingString:SeriesNum]];
+				[dicomElements setObject:[[NSString alloc] initWithFormat: @"%@-%@", self.serieID, SeriesNum] forKey:[@"seriesID" stringByAppendingString:SeriesNum]];
+                [dicomElements setObject:[[NSString alloc] initWithFormat: @"%@-%@", name, SeriesNum] forKey:[@"seriesDescription" stringByAppendingString:SeriesNum]];
+				[dicomElements setObject:[NSNumber numberWithInt: i] forKey:[@"seriesNumber" stringByAppendingString:SeriesNum]];
 			}
-////////////////
 			return 0;
 		}
 	}
-	
 	return -1;
 }
 
@@ -3985,6 +4026,11 @@ char* replaceBadCharacter (char* str, NSStringEncoding encoding)
 
 - (id) init:(NSString*) f DICOMOnly:(BOOL) DICOMOnly
 {
+	return [self init:f	DICOMOnly: NO sourcePath: nil];
+}
+
+- (id) init:(NSString*) f DICOMOnly:(BOOL) DICOMOnly sourcePath:(NSString*) s
+{
 	id returnVal = nil;
 //	NSLog(@"Init dicomFile: %d", DICOMOnly);
 	if( self = [super init])
@@ -3996,6 +4042,13 @@ char* replaceBadCharacter (char* str, NSStringEncoding encoding)
 		width = 1;
 		height = 1;
 		filePath = f;
+
+        sourcePath = s;
+        if (sourcePath == nil)
+            sourcePath = [[NSString alloc] initWithString:filePath];
+
+		[sourcePath retain];
+
 		NoOfSeries = 1;
 		
 		[filePath retain];
@@ -4081,6 +4134,11 @@ char* replaceBadCharacter (char* str, NSStringEncoding encoding)
 	return [self init:f	DICOMOnly:NO];
 }
 
+- (id) init:(NSString*) f sourcePath:(NSString*) s
+{
+	return [self init:f	DICOMOnly:NO sourcePath:s];
+}
+
 - (void) dealloc
 {
     [imageType release];
@@ -4093,6 +4151,7 @@ char* replaceBadCharacter (char* str, NSStringEncoding encoding)
     [serie release];
     [date release];
     [filePath release];
+    [sourcePath release];
     [studyID release];
 	[studyIDs release];
     self.serieID = nil;
