@@ -867,8 +867,9 @@ extern NSRecursiveLock *PapyrusLock;
                             while (count < 3 && eitem->findAndGetFloat64(DCM_ImagePositionPatient, originMultiFrame[count], count, OFFalse).good())
                                 count++;
                             
-                            if( count != 3)
-                                succeed = NO;
+                            if( count == 3)
+                                succeed = YES;
+                            else succeed = NO;
                         }
                         else succeed = NO;
                         
@@ -878,8 +879,9 @@ extern NSRecursiveLock *PapyrusLock;
                             while (count < 6 && eitem->findAndGetFloat64(DCM_ImageOrientationPatient, orientationMultiFrame[count], count, OFFalse).good())
                                 count++;
                             
-                            if( count != 6 && count != 0)
-                                succeed = NO;
+                            if( count == 6)
+                                succeed = YES;
+                            else succeed = NO;
                         }
                         else succeed = NO;
 					}
