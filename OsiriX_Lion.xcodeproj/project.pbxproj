@@ -1224,8 +1224,6 @@
 		A96F793816DBC59D000E877A /* libssl.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = BFBF3A9E09B681F500545F5E /* libssl.dylib */; };
 		A96F793916DBC59D000E877A /* libxml2.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = BFBF3A9F09B681F500545F5E /* libxml2.dylib */; };
 		A96F793A16DBC59D000E877A /* libz.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = BFBF3AA009B681F500545F5E /* libz.dylib */; };
-		A96F793B16DBC59D000E877A /* libdcmprintscu.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = CE586CC30C74B75D00DB7D5A /* libdcmprintscu.dylib */; };
-		A96F793C16DBC59D000E877A /* libxerces-c.27.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = CE6693C60AF551210073D923 /* libxerces-c.27.dylib */; };
 		A96F794F16DBC73F000E877A /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AB5E1A300595697700C48BEB /* Accelerate.framework */; };
 		A96F795016DBC73F000E877A /* AGL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AB38FC99057A9B050041FEBB /* AGL.framework */; };
 		A96F795116DBC73F000E877A /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 29B97324FDCFA39411CA2CEA /* AppKit.framework */; };
@@ -1743,8 +1741,6 @@
 		A99B7ECE0885A621004328C0 /* BonjourBrowser.h in Headers */ = {isa = PBXBuildFile; fileRef = A99B7E5408858D4F004328C0 /* BonjourBrowser.h */; };
 		A99F039A16E492AA008A3657 /* Growl.framework in CopyFiles */ = {isa = PBXBuildFile; fileRef = CE2BE05D1524344D00AE6156 /* Growl.framework */; };
 		A99F039D16E4934F008A3657 /* ILCrashReporter.framework in CopyFiles */ = {isa = PBXBuildFile; fileRef = ABE881440FC1444D009F5C80 /* ILCrashReporter.framework */; };
-		A99F039E16E49359008A3657 /* libxerces-c.27.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = CE6693C60AF551210073D923 /* libxerces-c.27.dylib */; };
-		A99F039F16E4935C008A3657 /* libdcmprintscu.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = CE586CC30C74B75D00DB7D5A /* libdcmprintscu.dylib */; };
 		A9A80E3811F73E22009F54B9 /* Activity_Stop.tif in Resources */ = {isa = PBXBuildFile; fileRef = A9A80E3611F73E22009F54B9 /* Activity_Stop.tif */; };
 		A9A80E3911F73E22009F54B9 /* Activity_StopPressed.tif in Resources */ = {isa = PBXBuildFile; fileRef = A9A80E3711F73E22009F54B9 /* Activity_StopPressed.tif */; };
 		A9A9F4C10A74C9A9005A1CA7 /* QTExportStyle.css in Resources */ = {isa = PBXBuildFile; fileRef = A9A9F4C00A74C9A9005A1CA7 /* QTExportStyle.css */; };
@@ -2186,8 +2182,6 @@
 		A9FBD38516DBE818003A0E04 /* OsiriX.framework in Copy Files */ = {isa = PBXBuildFile; fileRef = CE8D057D0FD8505000165DDE /* OsiriX.framework */; };
 		A9FBD38616DBE821003A0E04 /* OsiriXAPI.framework in Copy Files */ = {isa = PBXBuildFile; fileRef = AB0F3A2C1046BD2B004129DD /* OsiriXAPI.framework */; };
 		A9FBD38716DBE83E003A0E04 /* ILCrashReporter.framework in Copy Files */ = {isa = PBXBuildFile; fileRef = ABE881440FC1444D009F5C80 /* ILCrashReporter.framework */; };
-		A9FBD38816DBE84D003A0E04 /* libxerces-c.27.dylib in Copy Files */ = {isa = PBXBuildFile; fileRef = CE6693C60AF551210073D923 /* libxerces-c.27.dylib */; };
-		A9FBD38A16DBE855003A0E04 /* libdcmprintscu.dylib in Copy Files */ = {isa = PBXBuildFile; fileRef = CE586CC30C74B75D00DB7D5A /* libdcmprintscu.dylib */; };
 		A9FE55F410DB7DCF000D0395 /* OpenGLScreenReader.h in Headers */ = {isa = PBXBuildFile; fileRef = A930149210DA63C200AF0051 /* OpenGLScreenReader.h */; };
 		A9FEC1400907EBA600B218BE /* orthogonalReslice.tif in Resources */ = {isa = PBXBuildFile; fileRef = A9FEC13F0907EBA600B218BE /* orthogonalReslice.tif */; };
 		AB0128640635991400A74AA1 /* QuicktimeExport.h in Headers */ = {isa = PBXBuildFile; fileRef = AB0128620635991400A74AA1 /* QuicktimeExport.h */; };
@@ -4256,8 +4250,6 @@
 		CE97630308FABDA600E6F8B0 /* PaletteController.m in Sources */ = {isa = PBXBuildFile; fileRef = CE9762FF08FABDA600E6F8B0 /* PaletteController.m */; };
 		CE995076183E05D60087E409 /* PerpendicularLines.pdf in Resources */ = {isa = PBXBuildFile; fileRef = CE995075183E05D60087E409 /* PerpendicularLines.pdf */; };
 		CE99E890073AB4C500725ABC /* iPhoto.icns in Resources */ = {isa = PBXBuildFile; fileRef = CE99E88E073AB4C500725ABC /* iPhoto.icns */; };
-		CE9A04440C7DBC060007809F /* libxerces-c.27.dylib in Copy Frameworks */ = {isa = PBXBuildFile; fileRef = CE6693C60AF551210073D923 /* libxerces-c.27.dylib */; };
-		CE9A04450C7DBC060007809F /* libdcmprintscu.dylib in Copy Frameworks */ = {isa = PBXBuildFile; fileRef = CE586CC30C74B75D00DB7D5A /* libdcmprintscu.dylib */; };
 		CE9C734A0B34946B0062FCCC /* echoscu in Resources */ = {isa = PBXBuildFile; fileRef = CE9C73490B34946B0062FCCC /* echoscu */; };
 		CE9DD284086B35050058DD2A /* DicomStudy.m in Sources */ = {isa = PBXBuildFile; fileRef = CE9DD280086B35050058DD2A /* DicomStudy.m */; };
 		CE9DD285086B35050058DD2A /* DicomStudy.h in Headers */ = {isa = PBXBuildFile; fileRef = CE9DD281086B35050058DD2A /* DicomStudy.h */; };
@@ -4461,9 +4453,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 16;
 			files = (
-				A99F039E16E49359008A3657 /* libxerces-c.27.dylib in CopyFiles */,
 				A99F039A16E492AA008A3657 /* Growl.framework in CopyFiles */,
-				A99F039F16E4935C008A3657 /* libdcmprintscu.dylib in CopyFiles */,
 				A99F039D16E4934F008A3657 /* ILCrashReporter.framework in CopyFiles */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -4477,9 +4467,7 @@
 				A9FBD38616DBE821003A0E04 /* OsiriXAPI.framework in Copy Files */,
 				A9FBD38416DBE782003A0E04 /* Growl.framework in Copy Files */,
 				A9FBD38516DBE818003A0E04 /* OsiriX.framework in Copy Files */,
-				A9FBD38816DBE84D003A0E04 /* libxerces-c.27.dylib in Copy Files */,
 				A9FBD38716DBE83E003A0E04 /* ILCrashReporter.framework in Copy Files */,
-				A9FBD38A16DBE855003A0E04 /* libdcmprintscu.dylib in Copy Files */,
 			);
 			name = "Copy Files";
 			runOnlyForDeploymentPostprocessing = 1;
@@ -4493,9 +4481,7 @@
 				59F1A515104BA8AE009E3215 /* OsiriXAPI.framework in Copy Frameworks */,
 				CE04B81B15289AF400EF6E52 /* Growl.framework in Copy Frameworks */,
 				CE81E2A50FDA9F00000D3D96 /* OsiriX.framework in Copy Frameworks */,
-				CE9A04440C7DBC060007809F /* libxerces-c.27.dylib in Copy Frameworks */,
 				84F453570FC3DF5400D29666 /* ILCrashReporter.framework in Copy Frameworks */,
-				CE9A04450C7DBC060007809F /* libdcmprintscu.dylib in Copy Frameworks */,
 			);
 			name = "Copy Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -6750,7 +6736,6 @@
 		CE5487790989363200CF4C60 /* Brush.tif */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; path = Brush.tif; sourceTree = "<group>"; };
 		CE569B720E29612100F4A234 /* ThumbnailCell.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ThumbnailCell.h; sourceTree = "<group>"; };
 		CE569B730E29612100F4A234 /* ThumbnailCell.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ThumbnailCell.m; sourceTree = "<group>"; };
-		CE586CC30C74B75D00DB7D5A /* libdcmprintscu.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libdcmprintscu.dylib; path = AYDicomPrint/libdcmprintscu.dylib; sourceTree = "<group>"; };
 		CE58A260146ECCE800F50080 /* WebPortalDB 5.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = "WebPortalDB 5.xcdatamodel"; sourceTree = "<group>"; };
 		CE594403155E3838007BDF5B /* NSApplication-Dock.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "NSApplication-Dock.h"; path = "LetsMoveAndDock/NSApplication-Dock.h"; sourceTree = "<group>"; };
 		CE594404155E3838007BDF5B /* NSApplication-Dock.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "NSApplication-Dock.m"; path = "LetsMoveAndDock/NSApplication-Dock.m"; sourceTree = "<group>"; };
@@ -6776,7 +6761,6 @@
 		CE65D9F015C4843300E9D94C /* DiskArbitration.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = DiskArbitration.framework; path = ../../../../System/Library/Frameworks/DiskArbitration.framework; sourceTree = "<group>"; };
 		CE6692D80AF545F90073D923 /* printView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = printView.h; sourceTree = "<group>"; };
 		CE6692D90AF545F90073D923 /* printView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = printView.m; sourceTree = "<group>"; };
-		CE6693C60AF551210073D923 /* libxerces-c.27.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = "libxerces-c.27.dylib"; path = "AYDicomPrint/libxerces-c.27.dylib"; sourceTree = "<group>"; };
 		CE6C77EB09739B3100F951C2 /* Rotate3DCursor.tif */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; name = Rotate3DCursor.tif; path = Cursors/Rotate3DCursor.tif; sourceTree = "<group>"; };
 		CE6C77EC09739B3100F951C2 /* Rotate3DCameraCursor.tif */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; name = Rotate3DCameraCursor.tif; path = Cursors/Rotate3DCameraCursor.tif; sourceTree = "<group>"; };
 		CE6CD06B0CFB0462001DF429 /* OsiriXToolbar.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OsiriXToolbar.h; sourceTree = "<group>"; };
@@ -6982,7 +6966,6 @@
 		CEEB5CCA0CCDD161008803E2 /* Centerline.tif */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; path = Centerline.tif; sourceTree = "<group>"; };
 		CEEDA35306A061EB00DEAB22 /* ThickSlabVR.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ThickSlabVR.h; sourceTree = "<group>"; };
 		CEEDA35406A061EB00DEAB22 /* ThickSlabVR.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ThickSlabVR.mm; sourceTree = "<group>"; };
-		CEEE567C1775EB11008C6DFA /* libPapyrusToolkit.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libPapyrusToolkit.a; path = Binaries/libPapyrusToolkit.a; sourceTree = "<group>"; };
 		CEF09316182D23B20020C70A /* English */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = English; path = Binaries/English.lproj/ThumbnailsList.xib; sourceTree = "<group>"; };
 		CEF0E4BB06AEC91F001FF9E5 /* Message.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Message.framework; path = /System/Library/Frameworks/Message.framework; sourceTree = "<absolute>"; };
 		CEF0E5FF06AEF326001FF9E5 /* Mailer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Mailer.h; sourceTree = "<group>"; };
@@ -7042,12 +7025,10 @@
 				A96F795616DBC73F000E877A /* DiscRecordingUI.framework in Frameworks */,
 				A96F795416DBC73F000E877A /* CoreVideo.framework in Frameworks */,
 				A96F796716DBC753000E877A /* 3DconnexionClient.framework in Frameworks */,
-				A96F793C16DBC59D000E877A /* libxerces-c.27.dylib in Frameworks */,
 				A96F793716DBC59D000E877A /* libcrypto.dylib in Frameworks */,
 				A96F793816DBC59D000E877A /* libssl.dylib in Frameworks */,
 				A96F793916DBC59D000E877A /* libxml2.dylib in Frameworks */,
 				A96F793A16DBC59D000E877A /* libz.dylib in Frameworks */,
-				A96F793B16DBC59D000E877A /* libdcmprintscu.dylib in Frameworks */,
 				A96F796816DBC753000E877A /* ILCrashReporter.framework in Frameworks */,
 				A96F796916DBC753000E877A /* OsiriX.framework in Frameworks */,
 				A96F795D16DBC740000E877A /* Security.framework in Frameworks */,
@@ -7394,12 +7375,9 @@
 		1058C7A2FEA54F0111CA2CBB /* Other Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				CEEE567C1775EB11008C6DFA /* libPapyrusToolkit.a */,
 				A97E19EE0CDF55E50065EE29 /* 3DconnexionClient.framework */,
 				ABE881440FC1444D009F5C80 /* ILCrashReporter.framework */,
 				CE2BE05D1524344D00AE6156 /* Growl.framework */,
-				CE586CC30C74B75D00DB7D5A /* libdcmprintscu.dylib */,
-				CE6693C60AF551210073D923 /* libxerces-c.27.dylib */,
 				CE8D057D0FD8505000165DDE /* OsiriX.framework */,
 			);
 			name = "Other Frameworks";
