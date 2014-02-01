@@ -14,7 +14,11 @@
 
 #define USE3DCONNEXION 1
 
+
+
+
 #import "VRView.h"
+#import "OsiriXFixedPointVolumeRayCastMapper.h"
 #import "DCMCursor.h"
 #import "AppController.h"
 #import "DCMPix.h"
@@ -857,7 +861,7 @@ public:
     if( textureMapper == nil)
     {
         textureMapper = vtkGPUVolumeRayCastMapper::New();
-        textureMapper->SetInput((vtkDataSet *) reader->GetOutput());
+	textureMapper->SetInputData((vtkDataSet *) reader->GetOutput());
         
         long memory = [VTKView VRAMSizeForDisplayID: [[[[[self window] screen] deviceDescription] objectForKey: @"NSScreenNumber"] intValue]];
         
@@ -876,7 +880,7 @@ public:
     if( volumeMapper == nil)
     {
         volumeMapper = OsiriXFixedPointVolumeRayCastMapper::New();
-        volumeMapper->SetInput((vtkDataSet *) reader->GetOutput());
+	volumeMapper->SetInputData((vtkDataSet *) reader->GetOutput());
     }
     
     volume->SetMapper( volumeMapper);
@@ -1018,7 +1022,7 @@ public:
 			if( blendingVolumeMapper == nil)
 			{
 				blendingVolumeMapper = OsiriXFixedPointVolumeRayCastMapper::New();
-				blendingVolumeMapper->SetInput((vtkDataSet *) blendingReader->GetOutput());
+				blendingVolumeMapper->SetInputData((vtkDataSet *) blendingReader->GetOutput());
 			}
 			blendingVolume->SetMapper( blendingVolumeMapper);
 		break;
@@ -1028,7 +1032,7 @@ public:
             if( blendingTextureMapper == nil)
             {
                 blendingTextureMapper = vtkGPUVolumeRayCastMapper::New();
-                blendingTextureMapper->SetInput((vtkDataSet *) blendingReader->GetOutput());
+		blendingTextureMapper->SetInputData((vtkDataSet *) blendingReader->GetOutput());
                 
                 long memory = [VTKView VRAMSizeForDisplayID: [[[[[self window] screen] deviceDescription] objectForKey: @"NSScreenNumber"] intValue]];
                 blendingTextureMapper->SetMaxMemoryInBytes( memory);
@@ -6109,7 +6113,7 @@ public:
 			blendingReader->SetDataScalarTypeToUnsignedShort();
 			blendingReader->SetImportVoidPointer( blendingData8 );					//AVOID VTK BUG
 		}
-		
+		blendingReader->Update();
 		blendingNeedToFlip = NO;
 		if( blendingSliceThickness < 0 )
 		{
@@ -6216,11 +6220,12 @@ public:
 		blendingData = [blendingController volumePtr: index];
 		
 		blendingReader->SetImportVoidPointer( blendingData);	//AVOID VTK BUG
+        blendingReader->Update();
 		
 		// Force min/max recomputing
 		if( blendingVolumeMapper) blendingVolumeMapper->Delete();
 		blendingVolumeMapper = OsiriXFixedPointVolumeRayCastMapper::New();
-		blendingVolumeMapper->SetInput((vtkDataSet *) blendingReader->GetOutput());
+		blendingVolumeMapper->SetInputData((vtkDataSet *) blendingReader->GetOutput());
 		blendingVolumeMapper->SetMinimumImageSampleDistance( LOD);
 		blendingVolume->SetMapper( blendingVolumeMapper);
 		
@@ -6276,6 +6281,8 @@ public:
 			reader->SetImportVoidPointer( data8);
 			reader->GetOutput()->Modified();
 		}
+        
+        reader->Update();
 			
 		if( volumeMapper)
         {
@@ -6320,6 +6327,7 @@ public:
 					blendingReader->SetImportVoidPointer( blendingData8);
 					blendingReader->GetOutput()->Modified();
 				}
+                blendingReader->Update();
 					
 				if( blendingVolumeMapper) blendingVolumeMapper->Delete();
 				blendingVolumeMapper = nil;
@@ -6522,6 +6530,8 @@ public:
 		//	reader->SetImportVoidPointer(data);
 			
 		}
+        
+        reader->Update();
 		
 		[firstObject orientation:cosines];
 		
@@ -6636,10 +6646,10 @@ public:
 		volume->PickableOff();
 		
 		outlineData = vtkOutlineFilter::New();
-		outlineData->SetInput((vtkDataSet *) reader->GetOutput());
+		outlineData->SetInputData((vtkDataSet *) reader->GetOutput());
 		
 		mapOutline = vtkPolyDataMapper::New();
-		mapOutline->SetInput(outlineData->GetOutput());
+		mapOutline->SetInputData(outlineData->GetOutput());
 		
 		outlineRect = vtkActor::New();
 		outlineRect->SetMapper(mapOutline);
@@ -6750,7 +6760,7 @@ public:
 		rect->Delete();
 		
 		ROI3D = vtkPolyDataMapper2D::New();
-		ROI3D->SetInput( ROI3DData);
+		ROI3D->SetInputData( ROI3DData);
 		
 		ROI3DActor = vtkActor2D::New();
 		ROI3DActor->GetPositionCoordinate()->SetCoordinateSystemToDisplay();
@@ -6801,7 +6811,7 @@ public:
 		rect->Delete();
 		
 		Line2D = vtkPolyDataMapper2D::New();
-		Line2D->SetInput( Line2DData);
+		Line2D->SetInputData( Line2DData);
 		
 		Line2DActor = vtkActor2D::New();
 		Line2DActor->GetPositionCoordinate()->SetCoordinateSystemToDisplay();
@@ -9001,7 +9011,7 @@ public:
 	if( volumeMapper == nil)
     {
         volumeMapper = OsiriXFixedPointVolumeRayCastMapper::New();
-        volumeMapper->SetInput((vtkDataSet *) reader->GetOutput());
+	volumeMapper->SetInputData((vtkDataSet *) reader->GetOutput());
     }
     
     return volumeMapper;

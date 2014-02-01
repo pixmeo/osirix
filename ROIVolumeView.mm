@@ -410,8 +410,10 @@
             reader->SetImportVoidPointer( (void*) [vD bytes]);
             reader->SetDataSpacing( factor*[copyPixList.lastObject pixelSpacingX], factor*[copyPixList.lastObject pixelSpacingY], factor * [copyPixList.lastObject sliceInterval]);
             
+            reader->Update();
+            
             vtkContourFilter *isoExtractor = vtkContourFilter::New();
-            isoExtractor->SetInput( reader->GetOutput());
+	    isoExtractor->SetInputData( reader->GetOutput());
             isoExtractor->SetValue(0, 500);
             
             reader->Delete();
@@ -427,7 +429,7 @@
                 float decimateVal = 0.5;
                 
                 isoDeci = vtkDecimatePro::New();
-                isoDeci->SetInput( previousOutput);
+		isoDeci->SetInputData( previousOutput);
                 isoDeci->SetTargetReduction( decimateVal);
                 isoDeci->SetPreserveTopology( TRUE);
                 
@@ -446,7 +448,7 @@
                 float smoothVal = 20;
                 
                 isoSmoother = vtkSmoothPolyDataFilter::New();
-                isoSmoother->SetInput( previousOutput);
+		isoSmoother->SetInputData( previousOutput);
                 isoSmoother->SetNumberOfIterations( smoothVal);
                 //		isoSmoother->SetRelaxationFactor(0.05);
                 
@@ -456,11 +458,11 @@
             
             
             vtkPolyDataNormals *isoNormals = vtkPolyDataNormals::New();
-            isoNormals->SetInput( previousOutput);
+	    isoNormals->SetInputData( previousOutput);
             isoNormals->SetFeatureAngle( 120);
             
             vtkPolyDataMapper *isoMapper = vtkPolyDataMapper::New();
-            isoMapper->SetInput( isoNormals->GetOutput());
+	    isoMapper->SetInputData( isoNormals->GetOutput());
             isoMapper->ScalarVisibilityOff();
             
             isoMapper->Update();
@@ -482,18 +484,18 @@
         case 1:
         {
             vtkDelaunay3D *delaunayTriangulator = vtkDelaunay3D::New();
-            delaunayTriangulator->SetInput( profile);
+	    delaunayTriangulator->SetInputData( profile);
             
             delaunayTriangulator->SetTolerance( 0.001);
             delaunayTriangulator->SetAlpha( 20);
             delaunayTriangulator->BoundingTriangulationOff();
             
             vtkTextureMapToSphere *tmapper = vtkTextureMapToSphere::New();
-            tmapper->SetInput( (vtkDataSet*) delaunayTriangulator->GetOutput());
+	    tmapper->SetInputData( (vtkDataSet*) delaunayTriangulator->GetOutput());
             tmapper->PreventSeamOn();
             
             vtkDataSetMapper *map = vtkDataSetMapper::New();
-            map->SetInput( tmapper->GetOutput());
+	    map->SetInputData( tmapper->GetOutput());
             map->ScalarVisibilityOff();
             
             map->Update();
@@ -510,20 +512,20 @@
         case 0:
         {
             vtkPowerCrustSurfaceReconstruction *power = vtkPowerCrustSurfaceReconstruction::New();
-            power->SetInput( profile);
+	    power->SetInputData( profile);
             
             vtkPolyDataNormals *polyDataNormals = vtkPolyDataNormals::New();
             polyDataNormals->ConsistencyOn();
             polyDataNormals->AutoOrientNormalsOn();
-            polyDataNormals->SetInput(power->GetOutput());
+	    polyDataNormals->SetInputData(power->GetOutput());
             power->Delete();
             
             vtkTextureMapToSphere *tmapper = vtkTextureMapToSphere::New();
-            tmapper->SetInput( polyDataNormals->GetOutput());
+	    tmapper->SetInputData( polyDataNormals->GetOutput());
             tmapper->PreventSeamOn();
             
             vtkDataSetMapper *map = vtkDataSetMapper::New();
-            map->SetInput( tmapper->GetOutput());
+	    map->SetInputData( tmapper->GetOutput());
             map->ScalarVisibilityOff();
             
             map->Update();
@@ -614,7 +616,7 @@
 				texture->InterpolateOn();
                 texture->SetRepeat( 1);
 			}
-			texture->SetInput( bmpread->GetOutput());
+			texture->SetInputData( bmpread->GetOutput());
 			   
 			bmpread->Delete();
 

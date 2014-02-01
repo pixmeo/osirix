@@ -36,8 +36,6 @@
 
 extern "C"
 {
-	extern short Papy3Init ();
-
 
     void exitOsiriX(void)
     {
@@ -527,8 +525,7 @@ int main(int argc, const char *argv[])
 # pragma mark testFiles
 		if( [what isEqualToString: @"testFiles"])
 		{
-			Papy3Init();
-			
+
 			//[DCMPixelDataAttribute setUse_kdu_IfAvailable: [[dict objectForKey:@"UseKDUForJPEG2000"] intValue]];
 			
 			UseOpenJpeg = [[dict objectForKey:@"UseOpenJpegForJPEG2000"] intValue];

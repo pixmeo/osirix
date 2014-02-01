@@ -211,6 +211,8 @@
 	//	reader->SetImportVoidPointer(data);
 		reader->SetImportVoidPointer(data8);
 	}
+    
+    reader->Update();
 	
 	[firstObject orientation:cosines];
 	
@@ -381,10 +383,10 @@
 	volume->PickableOff();
 	
 	outlineData = vtkOutlineFilter::New();
-	outlineData->SetInput((vtkDataSet *) reader->GetOutput());
+	outlineData->SetInputData((vtkDataSet *) reader->GetOutput());
 	
     mapOutline = vtkPolyDataMapper::New();
-    mapOutline->SetInput(outlineData->GetOutput());
+    mapOutline->SetInputData(outlineData->GetOutput());
     
     outlineRect = vtkActor::New();
     outlineRect->SetMapper(mapOutline);
@@ -551,7 +553,7 @@
 	rect->Delete();
 //	
 	Line2D = vtkPolyDataMapper2D::New();
-	Line2D->SetInput( Line2DData);
+	Line2D->SetInputData( Line2DData);
 //	
 	Line2DActor = vtkActor2D::New();
 //	Line2DActor->GetPositionCoordinate()->SetCoordinateSystemToDisplay();

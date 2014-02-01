@@ -40,7 +40,6 @@
 #import "AppController.h"
 #import "ToolbarPanel.h"
 #import "ThumbnailsListPanel.h"
-#import "Papyrus3/Papyrus3.h"
 #import "DCMView.h"
 #import "StudyView.h"
 #import "ColorTransferView.h"
@@ -6845,28 +6844,28 @@ return YES;
                 if (shutterRect.origin.x + shutterRect.size.width > p.pwidth) shutterRect.size.width = p.pwidth - shutterRect.origin.x;
                 if (shutterRect.origin.y + shutterRect.size.height > p.pheight) shutterRect.size.height = p.pheight - shutterRect.origin.y;
                 
-				p.shutterRect = shutterRect;
-				p.shutterEnabled = NSOnState;
+//				p.shutterRect = shutterRect;
+//				p.shutterEnabled = NSOnState;
 			}
 		}
 		else
 		{
-			//using stored shutterRect?
-			if( (curPix.shutterRect.size.width == 0 || (curPix.shutterRect.size.width == [curPix pwidth] && curPix.shutterRect.size.height == [curPix pheight])) && curPix.shutterPolygonal == nil)
-			{
-				[shutterOnOff setState:NSOffState];
-				
-				NSRunCriticalAlertPanel(NSLocalizedString(@"Shutter", nil), NSLocalizedString(@"Please first define a rectangle with a rectangular ROI.", nil), NSLocalizedString(@"OK", nil), nil, nil);
-			}
-			else //reuse preconfigured shutterRect
-			{
-				for( DCMPix *p in [imageView dcmPixList]) p.shutterEnabled = NSOnState;
-			}
+//			//using stored shutterRect?
+//			if( (curPix.shutterRect.size.width == 0 || (curPix.shutterRect.size.width == [curPix pwidth] && curPix.shutterRect.size.height == [curPix pheight])) && curPix.shutterPolygonal == nil)
+//			{
+//				[shutterOnOff setState:NSOffState];
+//				
+//				NSRunCriticalAlertPanel(NSLocalizedString(@"Shutter", nil), NSLocalizedString(@"Please first define a rectangle with a rectangular ROI.", nil), NSLocalizedString(@"OK", nil), nil, nil);
+//			}
+//			else //reuse preconfigured shutterRect
+//			{
+//				for( DCMPix *p in [imageView dcmPixList]) p.shutterEnabled = NSOnState;
+//			}
 		}
 	}
 	else
 	{
-		for( DCMPix *p in [imageView dcmPixList]) p.shutterEnabled = NSOffState;
+		//for( DCMPix *p in [imageView dcmPixList]) p.shutterEnabled = NSOffState;
 	}
 	[imageView setIndex: [imageView curImage]]; //refresh viewer only
 }
@@ -8829,9 +8828,9 @@ static int avoidReentryRefreshDatabase = 0;
             [imageView setStartWLWW];
         }
     }
-    
-    if( firstPix.shutterEnabled)
-        [self setShutterOnOffButton: [NSNumber numberWithBool: YES]];
+//    
+//    if( firstPix.shutterEnabled)
+//        [self setShutterOnOffButton: [NSNumber numberWithBool: YES]];
 	
     [self setWindowTitle:self];
     
@@ -16326,11 +16325,11 @@ int i,j,l;
 			
 			if( [[vC modality] isEqualToString:@"MR"] == YES && [[self modality] isEqualToString:@"MR"] == YES)
 			{
-                if( imageView.curDCM.repetitionTime != vC.imageView.curDCM.repetitionTime ||
-                    imageView.curDCM.echoTime != vC.imageView.curDCM.echoTime)
-					{
-						propagate = NO;
-					}
+//                if( imageView.curDCM.repetitionTime != vC.imageView.curDCM.repetitionTime ||
+//                    imageView.curDCM.echoTime != vC.imageView.curDCM.echoTime)
+//					{
+//						propagate = NO;
+//					}
 			}
 			
 			if( [[NSUserDefaults standardUserDefaults] boolForKey:@"DONTCOPYWLWWSETTINGS"] == NO)

@@ -100,6 +100,10 @@
 */
 - (void)extractSeriesStudyImageNumbersFromFileName:(NSString *)tempString;  
 
+#ifndef OSIRIX_LIGHT
+- (short) decodeDICOMFileWithDCMFramework; /**< Decodes the file using the DCM Framework  Returns -1 for failure 0 for success*/
+#endif
+
 -(short) getDicomFile;  /**< Decode DICOM.  Returns -1 for failure 0 for success */
 
 #ifndef DECOMPRESS_APP

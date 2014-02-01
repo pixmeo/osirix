@@ -80,7 +80,6 @@
 #import "Reports.h"
 #include <OpenGL/OpenGL.h>
 
-#include <kdu_OsiriXSupport.h>
 
 #include <execinfo.h>
 #include <stdio.h>
@@ -888,6 +887,7 @@ static NSDate *lastWarningDate = nil;
 
 + (void) displayImportantNotice:(id) sender
 {
+    /*
     if( [AppController isFDACleared])
         return;
     
@@ -903,12 +903,12 @@ static NSDate *lastWarningDate = nil;
 	}
 	
 	[lastWarningDate release];
-	lastWarningDate = [[NSDate date] retain];
+	lastWarningDate = [[NSDate date] retain]; */
 }
 
 + (BOOL) isKDUEngineAvailable
 {
-	return kdu_available();
+	return true;
 }
 
 + (void) checkForPreferencesUpdate: (BOOL) b

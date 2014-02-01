@@ -3,31 +3,12 @@ OsiriX_Lion.xcodeproj/project.xcworkspace/xcuserdata/
 *.xcworkspace
 *.DS_Store
 __MACOSX/
-Binaries/__MACOSX/
 build/
-VTKHeaders/
-ITK180/
+Binaries
 AYDicomPrint/
 AYDicomPrint/xercesc
 AYDicomPrint/libxerces-c.27.dylib
 AYDicomPrint/libdcmprintscu.dylib
-Binaries/VTKLibs/
-Binaries/weasis/
-Binaries/DCMTK/
-Binaries/dciodvfy
-Binaries/libPapyrusToolkit.a
-Binaries/Ming/
-Binaries/PAGES/
-Binaries/DB_Previous_Models/
-Binaries/OsiriX Report.template
-Binaries/3DconnexionClient.framework/
-Binaries/Growl.framework/
-Binaries/ILCrashReporter.framework/
-Binaries/KDU SDK/libkdu_v73R.a
-Binaries/LibTiff/
-Binaries/openjpeg/
-Binaries/._OsiriX Report.template
-Binaries/ReportsToPDF/odt2pdf/build/odt2pdf
 
 *.xcscheme
 

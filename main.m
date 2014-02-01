@@ -14,7 +14,6 @@
 
 
 #import <Cocoa/Cocoa.h>
-#import "Papyrus3/Papyrus3.h"
 #import "NSFont_OpenGL.h"
 
 #ifndef OSIRIX_LIGHT
@@ -23,8 +22,7 @@
 
 int main(int argc, const char *argv[])
 {
-    Papy3Init();
-	
+
 	#ifndef OSIRIX_LIGHT
     FVTIFFInitialize();
 	#endif

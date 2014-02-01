@@ -2012,11 +2012,11 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	int w = d.pwidth;
 	int h = d.pheight;
 	
-	if( d.shutterEnabled)
-	{
-		w = d.shutterRect.size.width;
-		h = d.shutterRect.size.height;
-	}
+//	if( d.shutterEnabled)
+//	{
+//		w = d.shutterRect.size.width;
+//		h = d.shutterRect.size.height;
+//	}
 	
 	if( sizeView.size.width / w < sizeView.size.height / h / d.pixelRatio )
 		return sizeView.size.width / w;
@@ -2031,12 +2031,12 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	
 	self.scaleValue = [self scaleToFitForDCMPix: curDCM];
 	
-	if( curDCM.shutterEnabled)
-	{
-		origin.x = ((curDCM.pwidth  * 0.5f ) - ( curDCM.shutterRect.origin.x + ( curDCM.shutterRect.size.width  * 0.5f ))) * scaleValue;
-		origin.y = -((curDCM.pheight * 0.5f ) - ( curDCM.shutterRect.origin.y + ( curDCM.shutterRect.size.height * 0.5f ))) * scaleValue;
-	}
-	else
+//	if( curDCM.shutterEnabled)
+//	{
+//		origin.x = ((curDCM.pwidth  * 0.5f ) - ( curDCM.shutterRect.origin.x + ( curDCM.shutterRect.size.width  * 0.5f ))) * scaleValue;
+//		origin.y = -((curDCM.pheight * 0.5f ) - ( curDCM.shutterRect.origin.y + ( curDCM.shutterRect.size.height * 0.5f ))) * scaleValue;
+//	}
+//	else
 		origin.x = origin.y = 0;
 	
 	[self setNeedsDisplay:YES];
@@ -10015,11 +10015,11 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 									
 									NSPoint o = NSMakePoint( 0, 0);
 									
-									if( pix.shutterEnabled)
-									{
-										o.x = ((curDCM.pwidth  * 0.5f ) - ( curDCM.shutterRect.origin.x + ( curDCM.shutterRect.size.width  * 0.5f ))) * scaleValue;
-										o.y = -((curDCM.pheight * 0.5f ) - ( curDCM.shutterRect.origin.y + ( curDCM.shutterRect.size.height * 0.5f ))) * scaleValue;
-									}
+//									if( pix.shutterEnabled)
+//									{
+//										o.x = ((curDCM.pwidth  * 0.5f ) - ( curDCM.shutterRect.origin.x + ( curDCM.shutterRect.size.width  * 0.5f ))) * scaleValue;
+//										o.y = -((curDCM.pheight * 0.5f ) - ( curDCM.shutterRect.origin.y + ( curDCM.shutterRect.size.height * 0.5f ))) * scaleValue;
+//									}
 									
 									[pix.imageObj setValue: [NSNumber numberWithFloat: o.x] forKey:@"xOffset"];
 									[pix.imageObj setValue: [NSNumber numberWithFloat: o.y] forKey:@"yOffset"];
@@ -11797,8 +11797,8 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	if( curDCM.subtractedfImage) 
 		intFULL32BITPIPELINE = NO;
 	
-	if( curDCM.shutterEnabled) 
-		intFULL32BITPIPELINE = NO;
+//	if( curDCM.shutterEnabled) 
+//		intFULL32BITPIPELINE = NO;
 	
 	if( curDCM.pwidth >= maxTextureSize) 
 		intFULL32BITPIPELINE = NO;

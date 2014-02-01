@@ -12,21 +12,19 @@
      PURPOSE.
 =========================================================================*/
 
-
+#ifndef _VRVIEW_H_INCLUDED_
+#define _VRVIEW_H_INCLUDED_
 
 #import <AppKit/AppKit.h>
 #import "DCMPix.h"
 
 #ifdef __cplusplus
-#import "VTKView.h"
+#import "VTKViewOSIRIX.h"
 
 #define id Id
 #include "vtkCommand.h"
 #include "vtkActor.h"
 #include "vtkPolyData.h"
-#include "vtkRenderer.h"
-#include "vtkRenderWindow.h"
-#include "vtkRenderWindowInteractor.h"
 #include "vtkVolume16Reader.h"
 #include "vtkPolyDataMapper.h"
 #include "vtkActor.h"
@@ -640,3 +638,5 @@ void VRSpaceNavigatorMessageHandler(io_connect_t connection, natural_t messageTy
 #endif
 
 @end
+
+#endif
