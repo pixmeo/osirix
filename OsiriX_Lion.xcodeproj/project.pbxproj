@@ -16101,7 +16101,7 @@
 					"Deployment-Info.plist",
 				);
 				PRODUCT_NAME = OsiriX;
-				USER_HEADER_SEARCH_PATHS = "Binaries/ITKHeaders Binaries/VTKHeaders Binaries/openjpeg";
+				USER_HEADER_SEARCH_PATHS = "$(SRCROOT)/Binaries/ITKHeaders $(SRCROOT)/Binaries/VTKHeaders $(SRCROOT)/Binaries/openjpeg";
 			};
 			name = Development;
 		};
@@ -16614,7 +16614,7 @@
 				PRODUCT_NAME = OsiriX;
 				STRIP_INSTALLED_PRODUCT = YES;
 				STRIP_STYLE = debugging;
-				USER_HEADER_SEARCH_PATHS = "Binaries/ITKHeaders Binaries/VTKHeaders Binaries/openjpeg";
+				USER_HEADER_SEARCH_PATHS = "$(SRCROOT)/Binaries/ITKHeaders $(SRCROOT)/Binaries/VTKHeaders $(SRCROOT)/Binaries/openjpeg";
 			};
 			name = "Deployment 32-bit";
 		};
@@ -16838,7 +16838,7 @@
 				PRODUCT_NAME = OsiriX;
 				STRIP_INSTALLED_PRODUCT = YES;
 				STRIP_STYLE = debugging;
-				USER_HEADER_SEARCH_PATHS = "Binaries/ITKHeaders Binaries/VTKHeaders Binaries/openjpeg";
+				USER_HEADER_SEARCH_PATHS = "$(SRCROOT)/Binaries/ITKHeaders $(SRCROOT)/Binaries/VTKHeaders $(SRCROOT)/Binaries/openjpeg";
 			};
 			name = "Deployment 64-bit";
 		};
