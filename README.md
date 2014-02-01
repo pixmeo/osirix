@@ -8,8 +8,8 @@ Currently, the 3D rendering is broken.
 
 To build, clone this repo, then:
 
-$ git submmodule init  
-$ git submodule update
+clone the osirixBinaries repo, rename to Binaries,
+and place in the osirix folder.
 
 Now you can build the "Osirix" target with XCode 5.
 
