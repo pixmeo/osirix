@@ -15,7 +15,6 @@
 #import "NSImage+OsiriX.h"
 #import "N2Debug.h"
 
-extern unsigned char* compressJPEG(int inQuality, unsigned char* inImageBuffP, int inImageHeight, int inImageWidth, int monochrome, int *destSize);
 extern NSRecursiveLock* PapyrusLock;
 
 @implementation NSImage (OsiriX)
@@ -32,7 +31,7 @@ extern NSRecursiveLock* PapyrusLock;
 		@try
 		{
 			int size;
-			unsigned char* p = compressJPEG(quality*100, [imageRep bitmapData], [imageRep pixelsHigh], [imageRep pixelsWide], 1, &size);
+			unsigned char* p = nil;/*compressJPEG(quality*100, [imageRep bitmapData], [imageRep pixelsHigh], [imageRep pixelsWide], 1, &size);*/
 			if (p)
 				result = [NSData dataWithBytesNoCopy: p length: size freeWhenDone: YES];
 		}

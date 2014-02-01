@@ -155,7 +155,7 @@
        bmpread->SetFileName( [location UTF8String]);
 
     textureImage = vtkTexture::New();
-       textureImage->SetInput( bmpread->GetOutput());
+       textureImage->SetInputData( bmpread->GetOutput());
        textureImage->InterpolateOn();
     bmpread->Delete();
 

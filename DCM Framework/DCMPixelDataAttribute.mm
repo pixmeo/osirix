@@ -22,14 +22,11 @@
 #import "DCMPixelDataAttributeJPEG12.h"
 #import "DCMPixelDataAttributeJPEG16.h"
 #import "Accelerate/Accelerate.h"
-
-//#import "jasper.h"
+#import "OPJSupport.h"
 
 
 static int Use_kdu_IfAvailable = 0;
 
-// KDU support
-#include "kdu_OsiriXSupport.h"
 
 #if __ppc__
 
@@ -1253,8 +1250,7 @@ static inline int int_ceildivpow2(int a, int b) {
 	NSMutableData *pixelData = nil;
 	
 //	BOOL succeed = NO;
-	
-	if( Use_kdu_IfAvailable && kdu_available())
+
 	{
 		long decompressedLength = 0;
 		
@@ -1265,7 +1261,9 @@ static inline int int_ceildivpow2(int a, int b) {
 		
 		int colorModel;
 		
-		void *p = kdu_decompressJPEG2K( (void*) [jpegData bytes], [jpegData length], &decompressedLength, &colorModel, processors);
+	OPJSupport opj ;
+		void *p = opj.decompressJPEG2K( (void*) [jpegData bytes],
+					[jpegData length], &decompressedLength, &colorModel);
 		if( p)
 		{
 			pixelData = [NSMutableData dataWithBytesNoCopy: p length:decompressedLength freeWhenDone: YES];
@@ -1532,7 +1530,6 @@ static inline int int_ceildivpow2(int a, int b) {
 
 - (NSMutableData *)encodeJPEG2000:(NSMutableData *)data quality:(int)quality
 {
-	if( Use_kdu_IfAvailable && kdu_available())
 	{
 		int precision = [[_dcmObject attributeValueWithName:@"BitsStored"] intValue];
 		int rate = 0;
@@ -1572,7 +1569,9 @@ static inline int int_ceildivpow2(int a, int b) {
         if( processors > 8)
             processors = 8;
         
-		void *outBuffer = kdu_compressJPEG2K( (void*) [data bytes], _samplesPerPixel, _rows, _columns, precision, false, rate, &compressedLength, processors);
+	OPJSupport opj;
+
+		void *outBuffer = opj.compressJPEG2K( (void*) [data bytes], _samplesPerPixel, _rows, _columns, precision, false, rate, &compressedLength);
 		
 		NSMutableData *jpeg2000Data = [NSMutableData dataWithBytesNoCopy: outBuffer length: compressedLength freeWhenDone: YES];
 		

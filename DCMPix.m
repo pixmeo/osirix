@@ -16,8 +16,6 @@
 #import "DicomImage.h"
 #import "DicomSeries.h"
 #import "DicomStudy.h"
-#import "Papyrus3/Papyrus3.h"
-#import "Papyrus3/PapyGlobalVar3.h"
 #import <AVFoundation/AVFoundation.h>
 #import <OsiriX/DCM.h>
 #import <OsiriX/DCMAbstractSyntaxUID.h>
@@ -47,7 +45,7 @@
 #import "ThickSlabController.h"
 #import "dicomFile.h"
 #import "PluginFileFormatDecoder.h"
-#include "tiffio.h"
+#include "vtktiff/tiffio.h"
 #ifndef OSIRIX_LIGHT
 #include "FVTiff.h"
 #endif
@@ -72,6 +70,10 @@
 #else
 #define PREVIEWSIZE 68
 #endif
+
+/* Definition of the photometric interpretation */
+enum EPhoto_Interpret    {MONOCHROME1, MONOCHROME2, PALETTE, RGB, HSV, ARGB, CMYK,
+	YBR_FULL, YBR_FULL_422, YBR_PARTIAL_422, YBR_RCT, YBR_ICT, YUV_RCT, UNKNOWN_COLOR};
 
 BOOL gUserDefaultsSet = NO;
 BOOL gUseShutter = NO;
@@ -1658,75 +1660,64 @@ void erase_outside_circle(char *buf, int width, int height, int cx, int cy, int 
 	
 	[self compute8bitRepresentation];
 	
-    @try {
-        if( [self isRGB] == YES)
-        {
-            i = width * height * 3;
-            buf = malloc( i);
-            if( buf)
-            {
-                unsigned char *dst = buf, *src = (unsigned char*) [self baseAddr];
-                i = width * height;
-                
-                // CONVERT ARGB TO RGB
-                while( i-- > 0)
-                {
-                    src++;
-                    *dst++ = *src++;
-                    *dst++ = *src++;
-                    *dst++ = *src++;
-                }
-                
-                rep = [[[NSBitmapImageRep alloc]
-                        initWithBitmapDataPlanes:nil
-                        pixelsWide:width
-                        pixelsHigh:height
-                        bitsPerSample:8
-                        samplesPerPixel:3
-                        hasAlpha:NO
-                        isPlanar:NO
-                        colorSpaceName:NSCalibratedRGBColorSpace
-                        bytesPerRow:width*3
-                        bitsPerPixel:24] autorelease];
-                
-                if( rep)
-                {
-                    memcpy( [rep bitmapData], buf, height*width*3);
-                    
-                    imageRep = [[[NSImage alloc] init] autorelease];
-                    [imageRep addRepresentation:rep];
-                }
-                
-                free( buf);
-            }
-        }
-        else
-        {
+	if( [self isRGB] == YES)
+	{
+		i = width * height * 3;
+		buf = malloc( i);
+		if( buf)
+		{
+			unsigned char *dst = buf, *src = (unsigned char*) [self baseAddr];
+			i = width * height;
+			
+			// CONVERT ARGB TO RGB
+			while( i-- > 0)
+			{
+				src++;
+				*dst++ = *src++;
+				*dst++ = *src++;
+				*dst++ = *src++;
+			}
+            
             rep = [[[NSBitmapImageRep alloc]
                     initWithBitmapDataPlanes:nil
                     pixelsWide:width
                     pixelsHigh:height
                     bitsPerSample:8
-                    samplesPerPixel:1
+                    samplesPerPixel:3
                     hasAlpha:NO
                     isPlanar:NO
-                    colorSpaceName:NSCalibratedWhiteColorSpace
-                    bytesPerRow:width
-                    bitsPerPixel:8] autorelease];
+                    colorSpaceName:NSCalibratedRGBColorSpace
+                    bytesPerRow:width*3
+                    bitsPerPixel:24] autorelease];
             
-            if( rep)
-            {
-                memcpy( [rep bitmapData], [self baseAddr], height*width);
+            memcpy( [rep bitmapData], buf, height*width*3);
             
-                imageRep = [[[NSImage alloc] init] autorelease];
-                [imageRep addRepresentation:rep];
-            }
+            imageRep = [[[NSImage alloc] init] autorelease];
+            [imageRep addRepresentation:rep];
+            
+            free( buf);
         }
-    }
-    @catch (NSException *exception) {
-        N2LogException( exception);
-    }
-    
+	}
+	else
+	{
+		rep = [[[NSBitmapImageRep alloc]
+				initWithBitmapDataPlanes:nil
+				pixelsWide:width
+				pixelsHigh:height
+				bitsPerSample:8
+				samplesPerPixel:1
+				hasAlpha:NO
+				isPlanar:NO
+				colorSpaceName:NSCalibratedWhiteColorSpace
+				bytesPerRow:width
+				bitsPerPixel:8] autorelease];
+		
+		memcpy( [rep bitmapData], [self baseAddr], height*width);
+		
+		imageRep = [[[NSImage alloc] init] autorelease];
+		[imageRep addRepresentation:rep];
+	}
+	
 	return imageRep;
 }
 
@@ -3556,7 +3547,7 @@ void erase_outside_circle(char *buf, int width, int height, int cx, int cy, int 
 		
 		memset( orientation, 0, sizeof orientation);
 		#ifdef OSIRIX_VIEWER
-		[self loadCustomImageAnnotationsPapyLink:-1];
+		[self loadCustomImageAnnotationsPapyLink:-1 DCMLink:nil];
 		#endif
     }
     return self;
@@ -5342,37 +5333,11 @@ void erase_outside_circle(char *buf, int width, int height, int cx, int cy, int 
 	
 	[annotationsDictionary removeAllObjects];
 	
-	@try
-	{
-        [self clearCachedPapyGroups];
-        
-        PapyShort fileNb = -1;
-        
-        [self getPapyGroup: 0];
-        
-        if( [[cachedPapyGroups valueForKey: srcFile] valueForKey: @"fileNb"])
-            fileNb = [[[cachedPapyGroups valueForKey: srcFile] valueForKey: @"fileNb"] intValue];
-        
-        if (fileNb >= 0)
-        {
-            if (gIsPapyFile [fileNb] == DICOM10) Papy3FSeek (gPapyFile [fileNb], SEEK_SET, 132L);
-            
-            [self loadCustomImageAnnotationsPapyLink:fileNb];
-            
-            if( numberOfFrames <= 1)
-                [self clearCachedPapyGroups];
-        }
-	}
-	@catch (NSException * e)
-	{
-		NSLog( @"*********** reloadAnnotations: %@", e);
-	}
 	
 	[PapyrusLock unlock];
 	#endif
 }
 
-/*
 - (void) dcmFrameworkLoad0x0018: (DCMObject*) dcmObject
 {
 	if( [dcmObject attributeValueWithName:@"PatientsWeight"]) patientsWeight = [[dcmObject attributeValueWithName:@"PatientsWeight"] floatValue];
@@ -5664,7 +5629,7 @@ void erase_outside_circle(char *buf, int width, int height, int cx, int cy, int 
         
 		for ( DCMObject *sequenceItem in seq.sequence)
 		{
-//US Regions --->
+/* US Regions --->
 			if( spacingFound == NO)
 			{
 				int physicalUnitsX = 0;
@@ -5692,7 +5657,7 @@ void erase_outside_circle(char *buf, int width, int height, int cx, int cy, int 
 					}
 				}
 			}
-//<--- US Regions
+<--- US Regions */
 // US Regions --->
 #ifdef OSIRIX_VIEWER
 
@@ -6182,7 +6147,7 @@ void erase_outside_circle(char *buf, int width, int height, int cx, int cy, int 
 			}
 			@catch (NSException *e)
 			{
-                N2LogExceptionWithStackTrace(e);
+                N2LogExceptionWithStackTrace(e/*, @"overlays dcmframework"*/);
 			}
 		}
 		
@@ -6410,11 +6375,11 @@ void erase_outside_circle(char *buf, int width, int height, int cx, int cy, int 
 				else
 					inverseVal = YES; savedWL = -savedWL;
 			}
-			//else if ( [colorspace hasPrefix:@"MONOCHROME2"])	{inverseVal = NO; savedWL = savedWL;}
+			/*else if ( [colorspace hasPrefix:@"MONOCHROME2"])	{inverseVal = NO; savedWL = savedWL;} */
 			if ( [colorspace hasPrefix:@"YBR"]) isRGB = YES;		
 			if ( [colorspace hasPrefix:@"PALETTE"])	{ bitsAllocated = 8; isRGB = YES; NSLog(@"Palette depth conveted to 8 bit");}
 			if ([colorspace rangeOfString:@"RGB"].location != NSNotFound) isRGB = YES;			
-			// ******** dcm Object will do this *******convertYbrToRgb -> planar is converted***
+			/******** dcm Object will do this *******convertYbrToRgb -> planar is converted***/		
 			if ([colorspace rangeOfString:@"YBR"].location != NSNotFound)
 			{
 				fPlanarConf = 0;
@@ -6526,7 +6491,7 @@ void erase_outside_circle(char *buf, int width, int height, int cx, int cy, int 
             }
             
 			
-			// ***********
+			//***********
 			
 			if( isRGB)
 			{
@@ -6741,133 +6706,6 @@ void erase_outside_circle(char *buf, int width, int height, int cx, int cy, int 
 	return returnValue;
 }
 #endif
-*/
-
-- (void*) getPapyGroup: (int) group
-{
-    return [self getPapyGroup: group error: nil];
-}
-
-- (void*) getPapyGroup: (int) group error: (int*) error
-{
-	NSString *groupKey = [NSString stringWithFormat:@"%d", group];
-	
-	SElement *theGroupP = nil;
-	
-	[PapyrusLock lock];
-	
-    if( error)
-        *error = 0;
-    
-	@try 
-	{
-		NSMutableDictionary *cachedGroupsForThisFile = [cachedPapyGroups valueForKey: srcFile];
-		
-		int fileNb = -1;
-		
-		if( cachedGroupsForThisFile == nil)
-		{
-			fileNb = Papy3FileOpen ( (char*) [srcFile UTF8String], (PAPY_FILE) 0, TRUE, 0);
-			
-			if( fileNb >= 0)
-			{
-				cachedGroupsForThisFile = [NSMutableDictionary dictionary];
-				[cachedPapyGroups setObject: cachedGroupsForThisFile forKey: srcFile];
-				[cachedGroupsForThisFile setValue: [NSNumber numberWithInt: fileNb]  forKey: @"fileNb"];
-				[cachedGroupsForThisFile setValue: [NSNumber numberWithInt: 1] forKey: @"count"];
-				
-				if( retainedCacheGroup != nil)
-					NSLog( @"******** DCMPix : retainedCacheGroup 5 != nil ! %@", srcFile);
-				
-				retainedCacheGroup = cachedGroupsForThisFile;
-				
-				if( [cachedPapyGroups count] >= kMax_file_open)
-					NSLog( @"******* WARNING: Too much files opened for Papyrus Toolkit");
-					
-				if( gPapyFile[ fileNb] == nil)
-					NSLog( @"******* WARNING: gPapyFile[ fileNb] == nil");
-			}
-			else
-            {
-                if( error)
-                    *error = fileNb;
-				NSLog( @"Papy3FileOpen failed : %d", fileNb);
-            }
-		}
-		else
-		{
-			fileNb = [[cachedGroupsForThisFile valueForKey: @"fileNb"] intValue];
-			
-			if( group == 0L)
-			{
-				if( retainedCacheGroup != nil)
-                    NSLog( @"******** DCMPix : retainedCacheGroup 6 != nil ! %@", srcFile);
-                
-                [cachedGroupsForThisFile setValue: [NSNumber numberWithInt: [[cachedGroupsForThisFile valueForKey: @"count"] intValue] +1] forKey: @"count"];
-                
-                retainedCacheGroup = cachedGroupsForThisFile;
-			}
-		}
-		
-		if( fileNb >= 0)
-		{
-			if( group == 0)
-			{
-				#if !__LP64__
-				theGroupP = (SElement*) 0xFFFFFFFF;
-				#else
-				theGroupP = (SElement*) 0xFFFFFFFFFFFFFFFF;
-				#endif
-			}
-			else
-			{
-				if( [cachedGroupsForThisFile valueForKey: groupKey] == nil)
-				{
-					int theErr = 0;
-					
-					if (gIsPapyFile[ fileNb] == DICOM10)
-						theErr = Papy3FSeek (gPapyFile [fileNb], SEEK_SET, 132L);
-					
-					if( theErr == 0)
-					{
-						theErr = Papy3GotoGroupNb (fileNb, group);
-                        
-						if( theErr >= 0)
-						{
-                            theErr = Papy3GroupReadNb(fileNb, &theGroupP, group);
-							if( theErr > 0)
-							{
-								[cachedGroupsForThisFile setValue: [NSValue valueWithPointer: theGroupP] forKey: groupKey];
-							}
-							else
-							{
-//								NSLog( @"Error while reading a group (Papyrus) : %@ - 0x%04x", groupKey, groupKey.intValue);
-                                
-                                if( error)
-                                    *error = theErr;
-							}
-						}
-						else
-						{
-							[cachedGroupsForThisFile setValue: [NSValue valueWithPointer: 0L]  forKey: groupKey];
-						}
-					}
-				}
-				else
-					theGroupP = [[cachedGroupsForThisFile valueForKey: groupKey] pointerValue];
-			}
-		}
-	}
-	@catch (NSException * e) 
-	{
-		N2LogExceptionWithStackTrace(e);
-	}
-	
-	[PapyrusLock unlock];
-	
-	return theGroupP;
-}  
-
 + (void) purgeCachedDictionaries
 {
 	if( [NSThread isMainThread] == NO)
@@ -6886,29 +6724,6 @@ void erase_outside_circle(char *buf, int width, int height, int cx, int cy, int 
         @try 
         {
             [cachedDCMFrameworkFiles removeAllObjects];
-        
-            for( NSString *file in [cachedPapyGroups allKeys])
-            {
-                NSMutableDictionary *cachedGroupsForThisFile = [cachedPapyGroups valueForKey: file];
-                
-                if( cachedGroupsForThisFile)
-                {
-                    int fileNb = [[cachedGroupsForThisFile valueForKey: @"fileNb"] intValue];
-                    [cachedGroupsForThisFile removeObjectForKey: @"fileNb"];
-                    [cachedGroupsForThisFile removeObjectForKey: @"count"];
-                        
-                    for( NSValue *pointer in [cachedGroupsForThisFile allValues])
-                    {
-                        SElement *theGroupP = (SElement*) [pointer pointerValue];
-                        Papy3GroupFree ( &theGroupP, TRUE);
-                    }
-                        
-                    [cachedPapyGroups removeObjectForKey: file];
-                    Papy3FileClose (fileNb, TRUE);
-                }
-            }
-            
-            [cachedPapyGroups removeAllObjects];
         }
         @catch (NSException * e) 
         {
@@ -6963,21 +6778,7 @@ void erase_outside_circle(char *buf, int width, int height, int cx, int cy, int 
 			[cachedGroupsForThisFile setValue: [NSNumber numberWithInt: [[cachedGroupsForThisFile objectForKey: @"count"] intValue]-1] forKey: @"count"];
 			retainedCacheGroup = nil;
 			
-			if( [[cachedGroupsForThisFile objectForKey: @"count"] intValue] <= 0)
-			{
-				int fileNb = [[cachedGroupsForThisFile valueForKey: @"fileNb"] intValue];
-				[cachedGroupsForThisFile removeObjectForKey: @"fileNb"];
-				[cachedGroupsForThisFile removeObjectForKey: @"count"];
-				
-				for( NSValue *pointer in [cachedGroupsForThisFile allValues])
-				{
-					SElement *theGroupP = (SElement*) [pointer pointerValue];
-					Papy3GroupFree ( &theGroupP, TRUE);
-				}
-				
-				[cachedPapyGroups removeObjectForKey: srcFile];
-				Papy3FileClose (fileNb, TRUE);
-			}
+
 		}
 	}
 	@catch (NSException * e) 
@@ -6988,2736 +6789,9 @@ void erase_outside_circle(char *buf, int width, int height, int cx, int cy, int 
 	[PapyrusLock unlock];
 }
 
-- (void) papyLoadGroup0x0018: (SElement*) theGroupP
-{
-	UValue_T *val;
-	PapyULong nbVal;
-	int elemType, i;
-	
-	val = Papy3GetElement (theGroupP, papSliceThicknessGr, &nbVal, &elemType);
-	if ( val && val->a && validAPointer( elemType))
-		sliceThickness = atof( val->a);
-	
-	val = Papy3GetElement (theGroupP, papSpacingBetweenSlicesGr, &nbVal, &elemType);
-	if ( val && val->a && validAPointer( elemType))
-		spacingBetweenSlices = atof( val->a);
-	
-	val = Papy3GetElement (theGroupP, papRepetitionTimeGr, &nbVal, &elemType);
-	if ( val && val->a && validAPointer( elemType))
-	{
-		[repetitiontime release];
-		repetitiontime = [[NSString stringWithFormat:@"%0.1f", atof( val->a)] retain];
-	}
-	
-	val = Papy3GetElement (theGroupP, papEchoTimeGr, &nbVal, &elemType);
-	if ( val && val->a && validAPointer( elemType))
-	{
-		[echotime release];
-		echotime = [[NSString stringWithFormat:@"%0.1f", atof( val->a)] retain];
-	}
-	
-	val = Papy3GetElement (theGroupP, papEffectiveEchoTime, &nbVal, &elemType);
-	if ( val)
-	{
-		[echotime release];
-		echotime = [[NSString stringWithFormat:@"%0.1f", val->fd] retain];
-	}
-	
-	val = Papy3GetElement (theGroupP, papFlipAngleGr, &nbVal, &elemType);
-	if ( val && val->a && validAPointer( elemType))
-	{
-		[flipAngle release];
-		flipAngle = [[NSString stringWithFormat:@"%0.1f", atof( val->a)] retain];
-	}
-	
-	val = Papy3GetElement (theGroupP, papViewPositionGr, &nbVal, &elemType);
-	if ( val && val->a && validAPointer( elemType))
-	{
-		[viewPosition release];
-		viewPosition = [[NSString stringWithCString:val->a encoding: NSISOLatin1StringEncoding] retain];
-	}
-	
-	val = Papy3GetElement (theGroupP, papPositionerPrimaryAngleGr, &nbVal, &elemType);
-	if ( val && val->a && validAPointer( elemType))
-	{
-		[positionerPrimaryAngle release];
-		positionerPrimaryAngle = [[NSNumber numberWithDouble: atof( val->a)] retain];
-	}
-	
-	val = Papy3GetElement (theGroupP, papPositionerSecondaryAngleGr, &nbVal, &elemType);
-	if ( val && val->a && validAPointer( elemType))
-	{
-		[positionerSecondaryAngle release];
-		positionerSecondaryAngle = [[NSNumber numberWithDouble: atof( val->a)] retain];
-	}
-	
-    val = Papy3GetElement (theGroupP, papEstimatedRadiographicMagnificationFactorGr, &nbVal, &elemType);
-	if ( val && val->a && validAPointer( elemType))
-		estimatedRadiographicMagnificationFactor = atof( val->a);
-    
-	val = Papy3GetElement (theGroupP, papPatientPositionGr, &nbVal, &elemType);
-	if ( val && val->a && validAPointer( elemType))
-	{
-		[patientPosition release];
-		patientPosition = [[NSString stringWithCString:val->a encoding: NSISOLatin1StringEncoding] retain];
-	}
-	
-	val = Papy3GetElement (theGroupP, papCineRateGr, &nbVal, &elemType);
-	if (!cineRate && val && val->a && validAPointer( elemType)) cineRate = atof( val->a);	//[[NSString stringWithFormat:@"%0.1f", ] floatValue];
-	
-	// Ultrasounds pixel spacing
-	if( [self.modalityString isEqualToString:@"US"])
-	{
-		val = Papy3GetElement (theGroupP, papSequenceofUltrasoundRegionsGr, &nbVal, &elemType);
-        
-        if( val && elemType == SQ && val->sq && nbVal >= 1)
-        {
-            // US Regions --->
-            // BOOL spacingFound = NO;
-            [usRegions release];
-            usRegions = [[NSMutableArray array] retain];
-            // <--- US Regions
-            
-            Papy_List	*dcmList = val->sq;
-            while (dcmList != NULL)
-            {
-                if( dcmList->object->item)
-                {
-                    SElement *gr = (SElement *)dcmList->object->item->object->group;
-//						if ( gr->group == 0x0018 && spacingFound == NO)
-                    if ( gr->group == 0x0018 )
-                    {
-/* US Regions --->
-                        int physicalUnitsX = 0;
-                        int physicalUnitsY = 0;
-                        int spatialFormat = 0;
-                        
-                        val = Papy3GetElement (gr, papPhysicalUnitsXDirectionGr, &nbVal, &elemType);
-                        if ( val) physicalUnitsX = val->us;
-                        val = Papy3GetElement (gr, papPhysicalUnitsYDirectionGr, &nbVal, &elemType);
-                        if ( val) physicalUnitsY = val->us;
-                        val = Papy3GetElement (gr, papRegionSpatialFormatGr, &nbVal, &elemType);
-                        if ( val) spatialFormat = val->us;
-                        
-                        if( physicalUnitsX == 3 && physicalUnitsY == 3 && spatialFormat == 1)	// We want only cm, for 2D images
-                        {
-                            double xxx = 0, yyy = 0;
-                            
-                            val = Papy3GetElement (gr, papPhysicalDeltaXGr, &nbVal, &elemType);
-                            if ( val) xxx = val->fd;
-                            val = Papy3GetElement (gr, papPhysicalDeltaYGr, &nbVal, &elemType);
-                            if ( val) yyy = val->fd;
-                            
-                            if( xxx && yyy)
-                            {
-                                pixelSpacingX = fabs( xxx) * 10.;	// These are in cm !
-                                pixelSpacingY = fabs( yyy) * 10.;
-                                spacingFound = YES;
-                                
-                                pixelSpacingFromUltrasoundRegions = YES;
-                            }
-                        }
-<--- US Regions */
-// US Regions --->
-#ifdef OSIRIX_VIEWER
-                        // Read US Region Calibration Attributes
-                        DCMUSRegion *usRegion = [[[DCMUSRegion alloc] init] autorelease];
-                        
-                        val = Papy3GetElement (gr, papRegionSpatialFormatGr, &nbVal, &elemType);
-                        if (val) [usRegion setRegionSpatialFormat: val->us];
-                        val = Papy3GetElement (gr, papRegionDataTypeGr, &nbVal, &elemType);
-                        if (val) [usRegion setRegionDataType: val->us];
-                        val = Papy3GetElement (gr, papRegionFlagsGr, &nbVal, &elemType);
-                        if (val) [usRegion setRegionFlags: val->us];
-
-                        val = Papy3GetElement (gr, papRegionLocationMinX0Gr, &nbVal, &elemType);
-                        if (val) [usRegion setRegionLocationMinX0: val->us];
-                        val = Papy3GetElement (gr, papRegionLocationMinY0Gr, &nbVal, &elemType);
-                        if (val) [usRegion setRegionLocationMinY0: val->us];
-                        val = Papy3GetElement (gr, papRegionLocationMaxX1Gr, &nbVal, &elemType);
-                        if (val) [usRegion setRegionLocationMaxX1: val->us];
-                        val = Papy3GetElement (gr, papRegionLocationMaxY1Gr, &nbVal, &elemType);
-                        if (val) [usRegion setRegionLocationMaxY1: val->us];
-                        
-                        val = Papy3GetElement (gr, papReferencePixelX0Gr, &nbVal, &elemType);
-                        if (val) [usRegion setReferencePixelX0: val->ss];
-                        [usRegion setIsReferencePixelX0Present:(val != nil)];
-                        val = Papy3GetElement (gr, papReferencePixelY0Gr, &nbVal, &elemType);
-                        if (val) [usRegion setReferencePixelY0: val->ss];
-                        [usRegion setIsReferencePixelY0Present:(val != nil)];
-                        
-                        val = Papy3GetElement (gr, papPhysicalUnitsXDirectionGr, &nbVal, &elemType);
-                        if (val) [usRegion setPhysicalUnitsXDirection: val->us];
-                        val = Papy3GetElement (gr, papPhysicalUnitsYDirectionGr, &nbVal, &elemType);
-                        if (val) [usRegion setPhysicalUnitsYDirection: val->us];
-
-                        val = Papy3GetElement (gr, papReferencePixelPhysicalValueXGr, &nbVal, &elemType);
-                        if (val) [usRegion setRefPixelPhysicalValueX: val->fd];
-                        val = Papy3GetElement (gr, papReferencePixelPhysicalValueYGr, &nbVal, &elemType);
-                        if (val) [usRegion setRefPixelPhysicalValueY: val->fd];
-
-                        val = Papy3GetElement (gr, papPhysicalDeltaXGr, &nbVal, &elemType);
-                        if (val) [usRegion setPhysicalDeltaX: val->fd];
-                        val = Papy3GetElement (gr, papPhysicalDeltaYGr, &nbVal, &elemType);
-                        if (val) [usRegion setPhysicalDeltaY: val->fd];
-                        
-                        val = Papy3GetElement (gr, papDopplerCorrectionAngleGr, &nbVal, &elemType);
-                        if (val) [usRegion setDopplerCorrectionAngle: val->fd];
-                        
-                        if ([usRegion physicalUnitsXDirection] == 3 && [usRegion physicalUnitsYDirection] == 3 && [usRegion regionSpatialFormat] == 1) {
-                            // We want only cm, for 2D images
-                            if ([usRegion physicalDeltaX] && [usRegion physicalDeltaY])
-                            {
-                                pixelSpacingX = fabs([usRegion physicalDeltaX]) * 10.;	// These are in cm !
-                                pixelSpacingY = fabs([usRegion physicalDeltaY]) * 10.;
-                                pixelSpacingFromUltrasoundRegions = YES;
-                            }
-                        }
-                        
-                        // Adds current US Region Calibration Attributes to usRegions collection
-                        [usRegions addObject:usRegion];
-
-                        //NSLog (@"papyLoadGroup0x0018 - US REGION is [%@]", [usRegion toString]);
-                        
-#endif
-// <--- US Regions
-                    }
-                }
-                dcmList = dcmList->next;
-            }
-        }
-	}
-	
-	if( pixelSpacingFromUltrasoundRegions == NO)
-	{
-		val = Papy3GetElement (theGroupP, papImagerPixelSpacingGr, &nbVal, &elemType);
-		if( val && nbVal == 2)
-		{
-			pixelSpacingY = atof( val++->a);
-            pixelSpacingX = atof( val++->a);
-		}
-	}
-	
-	if(!cineRate)
-	{
-		val = Papy3GetElement (theGroupP, papFrameDelayGr, &nbVal, &elemType);
-		if ( val && val->a && validAPointer( elemType))
-		{
-			if( atof( val->a) > 0)
-				cineRate = 1000./atof( val->a);
-		}
-	}
-	
-    if(!cineRate)
-	{
-		val = Papy3GetElement (theGroupP, papFrameTimeGr, &nbVal, &elemType);
-		if ( val && val->a && validAPointer( elemType))
-		{
-			if( atof( val->a) > 0)
-				cineRate = 1000./atof( val->a);
-		}
-	}
-    
-	if(!cineRate)
-	{
-		val = Papy3GetElement (theGroupP, papFrameTimeVectorGr, &nbVal, &elemType);
-		if ( val && val->a && validAPointer( elemType))
-		{
-			if( atof( val->a) > 0)
-				cineRate = 1000./atof( val->a);
-		}
-	}
-	
-	if( gUseShutter)
-	{
-		val = Papy3GetElement (theGroupP, papShutterShapeGr, &nbVal, &elemType);
-		if ( val && val->a && validAPointer( elemType))
-		{
-			PapyULong nbtmp;
-			
-			for( i = 0 ; i < nbVal; i++)
-			{
-                UValue_T *tmp = nil;
-                
-				if( [[NSString stringWithCString:val->a encoding: NSISOLatin1StringEncoding] isEqualToString:@"RECTANGULAR"])
-				{
-					DCMPixShutterOnOff = YES;
-					
-					tmp = Papy3GetElement (theGroupP, papShutterLeftVerticalEdgeGr, &nbtmp, &elemType);
-					if (tmp != NULL) shutterRect_x = atoi( tmp->a);
-					
-					tmp = Papy3GetElement (theGroupP, papShutterRightVerticalEdgeGr, &nbtmp, &elemType);
-					if (tmp != NULL) shutterRect_w = atoi( tmp->a) - shutterRect_x;
-					
-					tmp = Papy3GetElement (theGroupP, papShutterUpperHorizontalEdgeGr, &nbtmp, &elemType);
-					if (tmp != NULL) shutterRect_y = atoi( tmp->a);
-					
-					tmp = Papy3GetElement (theGroupP, papShutterLowerHorizontalEdgeGr, &nbtmp, &elemType);
-					if (tmp != NULL) shutterRect_h = atoi( tmp->a) - shutterRect_y;
-				}
-				else if( [[NSString stringWithCString:val->a encoding: NSISOLatin1StringEncoding] isEqualToString:@"CIRCULAR"])
-				{
-					DCMPixShutterOnOff = YES;
-					
-					tmp = Papy3GetElement (theGroupP, papCenterofCircularShutterGr, &nbtmp, &elemType);
-					if (tmp != NULL && nbtmp == 2)
-					{
-						shutterCircular_x = atoi( tmp++->a);
-						shutterCircular_y = atoi( tmp++->a);
-					}
-					
-					tmp = Papy3GetElement (theGroupP, papRadiusofCircularShutterGr, &nbtmp, &elemType);
-					if (tmp != NULL) shutterCircular_radius = atoi( tmp->a);
-				}
-				else if( [[NSString stringWithCString:val->a encoding: NSISOLatin1StringEncoding] isEqualToString:@"POLYGONAL"])
-				{
-					DCMPixShutterOnOff = YES;
-					
-					tmp = Papy3GetElement (theGroupP, papVerticesofthePolygonalShutterGr, &nbtmp, &elemType);
-					
-					if( shutterPolygonal) free( shutterPolygonal);
-					
-					shutterPolygonalSize = 0;
-					shutterPolygonal = malloc( nbtmp * sizeof( NSPoint) / 2);
-					
-					int y, x;
-					for( y = 0, x = 0 ; y < nbtmp; y+=2, x++)
-					{
-						shutterPolygonal[ x].x = atoi( tmp++->a);
-						shutterPolygonal[ x].y = atoi( tmp++->a);
-						shutterPolygonalSize++;
-					}
-				}
-				else NSLog( @"Shutter not supported: %@", [NSString stringWithCString:val->a encoding: NSISOLatin1StringEncoding]);
-				
-				val++;
-			}
-		}
-	}
-}
-
-- (void) papyLoadGroup0x0020: (SElement*) theGroupP
-{
-	UValue_T *val;
-	PapyULong nbVal;
-	int elemType;
-	
-	val = Papy3GetElement (theGroupP, papImagePositionPatientGr, &nbVal, &elemType);
-	if( val && nbVal == 3)
-	{
-		originX = atof( val++->a); originY = atof( val++->a); originZ = atof( val++->a);
-		isOriginDefined = YES;
-	}
-    else
-    {
-        val = Papy3GetElement (theGroupP, papImagePositionVolumeGr, &nbVal, &elemType);
-        if( val && nbVal == 3 && elemType == FD)
-        {
-            originX = val++->fd; originY = val++->fd; originZ = val++->fd;
-            isOriginDefined = YES;
-        }
-    }
-	
-	val = Papy3GetElement (theGroupP, papImageOrientationPatientGr, &nbVal, &elemType);
-	if ( val && nbVal == 6)
-	{
-		for( int j = 0; j < nbVal; j++)
-			orientation[ j]  = atof( val++->a);
-	}
-    else
-    {
-        val = Papy3GetElement (theGroupP, papImageOrientationVolumeGr, &nbVal, &elemType);
-        if( val && nbVal == 6 && elemType == FD)
-        {
-            for( int j = 0; j < nbVal; j++)
-                orientation[ j]  = val++->fd;
-        }
-    }
-	
-	val = Papy3GetElement (theGroupP, papImageLateralityGr, &nbVal, &elemType);
-	if( val && val->a && validAPointer( elemType))
-	{
-		[laterality release];
-		laterality = [[NSString stringWithCString:val->a encoding: NSISOLatin1StringEncoding] retain];
-	}
-	
-	val = Papy3GetElement (theGroupP, papFrameofReferenceUIDGr, &nbVal, &elemType);
-	if( val && val->a && validAPointer( elemType))
-		self.frameofReferenceUID = [NSString stringWithCString:val->a encoding: NSISOLatin1StringEncoding];
-	
-	if( laterality == nil)
-	{
-		val = Papy3GetElement (theGroupP, papLateralityGr, &nbVal, &elemType);
-		if( val && val->a && validAPointer( elemType))
-		{
-			[laterality release];
-			laterality = [[NSString stringWithCString:val->a encoding: NSISOLatin1StringEncoding] retain];
-		}
-	}
-}
-
-- (void) papyLoadGroup0x0028: (SElement*) theGroupP
-{
-	UValue_T *val, *val3;
-	PapyULong nbVal, pos;
-	int elemType;
-
-	val3 = Papy3GetElement (theGroupP, papRescaleInterceptGr, &pos, &elemType);
-	if( val3)
-    {
-		// get the last offset
-		for ( int j = 1; j < pos; j++) val3++;
-		offset =  atof( val3->a);
-	}
-	val3 = Papy3GetElement (theGroupP, papRescaleSlopeGr, &pos, &elemType);
-	if( val3)
-	{
-		// get the last slope
-		for ( int j = 1; j < pos; j++) val3++;
-		slope = atof( val3->a);
-		
-		if( slope == 0)
-			slope = 1.0;
-	}
-	
-	val = Papy3GetElement (theGroupP, papBitsAllocatedGr, &nbVal, &elemType);
-	if( val)
-		bitsAllocated = (int) val->us;
-	
-//	val = Papy3GetElement (theGroupP, papHighBitGr, &nbVal, &elemType);
-//	highBit = (int) val->us;
-	
-	val = Papy3GetElement (theGroupP, papBitsStoredGr, &nbVal, &elemType);
-	if( val)
-		bitsStored = (int) val->us;
-	
-    NSManagedObjectContext *iContext = nil;
-    
-	// ROWS
-	val = Papy3GetElement (theGroupP, papRowsGr, &nbVal, &elemType);
-	if ( val)
-	{
-		height = (int) (*val).us;
-#ifdef OSIRIX_VIEWER
-		if( savedHeightInDB != 0 && savedHeightInDB != height)
-		{
-            if( savedHeightInDB != OsirixDicomImageSizeUnknown)
-                NSLog( @"******* [[imageObj valueForKey:@'height'] intValue] != height - %d versus %d", (int)savedHeightInDB, (int)height);
-            
-            if( iContext == nil)
-                iContext = ([[NSThread currentThread] isMainThread] ? [[[BrowserController currentBrowser] database] managedObjectContext] : [[[BrowserController currentBrowser] database] independentContext]);
-            
-			[[iContext existingObjectWithID: imageObjectID error: nil] setValue: [NSNumber numberWithInt: height] forKey: @"height"];
-            
-			if( height > savedHeightInDB && fExternalOwnedImage)
-				height = savedHeightInDB;
-		}
-#endif
-	}
-	
-	// COLUMNS
-	val = Papy3GetElement (theGroupP, papColumnsGr, &nbVal, &elemType);
-	if ( val)
-	{
-		width = (int) (*val).us;
-#ifdef OSIRIX_VIEWER
-		if( savedWidthInDB != 0 && savedWidthInDB != width)
-		{
-            if( savedWidthInDB != OsirixDicomImageSizeUnknown)
-                NSLog( @"******* [[imageObj valueForKey:@'width'] intValue] != width - %d versus %d", (int)savedWidthInDB, (int)width);
-			
-            if( iContext == nil)
-                iContext = ([[NSThread currentThread] isMainThread] ? [[[BrowserController currentBrowser] database] managedObjectContext] : [[[BrowserController currentBrowser] database] independentContext]);
-            
-            [[iContext existingObjectWithID: imageObjectID error: nil] setValue: [NSNumber numberWithInt: width] forKey: @"width"];
-            
-			if( width > savedWidthInDB && fExternalOwnedImage)
-				width = savedWidthInDB;
-		}
-#endif
-	}
-    
-    [iContext save: nil];
-	
-	if( shutterRect_w == 0) shutterRect_w = width;
-	if( shutterRect_h == 0) shutterRect_h = height;
-	
-	// PIXEL REPRESENTATION
-	val = Papy3GetElement (theGroupP, papPixelRepresentationGr, &nbVal, &elemType);
-	if (val != NULL)
-	{
-		if( val->us == 1) fIsSigned = YES;
-		else fIsSigned = NO;
-	}
-	
-	val = Papy3GetElement (theGroupP, papWindowCenterGr, &nbVal, &elemType);
-	if ( val && val->a && validAPointer( elemType))
-		savedWL = atof( val->a);
-	
-	val = Papy3GetElement (theGroupP, papWindowWidthGr, &nbVal, &elemType);
-	if ( val && val->a && validAPointer( elemType))
-	{
-		savedWW = atof( val->a);
-		if(  savedWW < 0) savedWW =-savedWW;
-	}
-	
-    val = Papy3GetElement (theGroupP, papRescaleTypeGr, &nbVal, &elemType);
-	if (val && val->a && validAPointer(elemType))
-    {
-        self.rescaleType = [NSString stringWithCString:val->a encoding:NSISOLatin1StringEncoding];
-        
-        if( [self.rescaleType isEqualToString: @"US"]) // US = unspecified
-            self.rescaleType = @"";
-        
-        else if( [self.rescaleType.lowercaseString isEqualToString: @"houndsfield unit"])
-            self.rescaleType = @"HU";
-    }
-	// PLANAR CONFIGURATION
-	val = Papy3GetElement (theGroupP, papPlanarConfigurationGr, &nbVal, &elemType);
-	if ( val)
-		fPlanarConf = (int) val->us;
-	
-	if( pixelSpacingFromUltrasoundRegions == NO)
-	{
-		val = Papy3GetElement (theGroupP, papPixelSpacingGr, &nbVal, &elemType);
-		if( val && nbVal == 2)
-		{
-			pixelSpacingY = atof( val++->a);
-            pixelSpacingX = atof( val++->a);
-		}
-	}
-	
-	val = Papy3GetElement (theGroupP, papPixelAspectRatioGr, &nbVal, &elemType);
-	if( val && nbVal == 2)
-	{
-		float ratiox = 1, ratioy = 1;
-		
-		ratiox = atof( val++->a);
-        ratioy = atof( val++->a);
-		
-		if( ratioy != 0)
-			pixelRatio = ratiox / ratioy;
-	}
-	else if( pixelSpacingX != pixelSpacingY)
-	{
-		if( pixelSpacingY != 0 && pixelSpacingX != 0)
-            pixelRatio = pixelSpacingY / pixelSpacingX;
-	}
-	
-	[PapyrusLock lock];
-	
-	int fileNb = -1;
-	NSDictionary *dict = [cachedPapyGroups valueForKey: srcFile];
-	
-	if( [dict valueForKey: @"fileNb"] == nil)
-		[self getPapyGroup: 0];
-	
-	if( dict != nil && [dict valueForKey: @"fileNb"] == nil)
-		NSLog( @"******** dict != nil && [dict valueForKey: @fileNb] == nil");
-	
-	fileNb = [[dict valueForKey: @"fileNb"] intValue];
-	
-	if( fileNb >= 0)
-	{
-		if (gArrPhotoInterpret[ fileNb] == PALETTE)
-		{
-			BOOL found = NO, found16 = NO;
-			
-			if( clutRed) free( clutRed);
-			if( clutGreen) free( clutGreen);
-			if( clutBlue) free( clutBlue);
-			
-			clutRed = calloc( 65536, 1);		if( clutRed == nil) NSLog(@"error clutRed == nil");
-			clutGreen = calloc( 65536, 1);		if( clutGreen == nil) NSLog(@"error clutRed == nil");
-			clutBlue = calloc( 65536, 1);		if( clutBlue == nil) NSLog(@"error clutRed == nil");
-			
-			// initialisation
-			clutEntryR = clutEntryG = clutEntryB = 0;
-			clutDepthR = clutDepthG = clutDepthB = 0;
-			
-			// read the RED descriptor of the color lookup table
-			val = Papy3GetElement (theGroupP, papRedPaletteColorLookupTableDescriptorGr, &nbVal, &elemType);
-			if ( val)
-			{
-				clutEntryR = val->us;
-				val++;val++;
-				clutDepthR = val->us;
-			} // if ...read Red palette color descriptor
-			
-			// read the GREEN descriptor of the color lookup table
-			val = Papy3GetElement (theGroupP, papGreenPaletteColorLookupTableDescriptorGr, &nbVal, &elemType);
-			if ( val)
-			{
-				clutEntryG	= val->us;
-				val++;val++;
-				clutDepthG	= val->us;
-			} // if ...read Green palette color descriptor
-			
-			// read the BLUE descriptor of the color lookup table
-			val = Papy3GetElement (theGroupP, papBluePaletteColorLookupTableDescriptorGr, &nbVal, &elemType);
-			if ( val)
-			{
-				clutEntryB = val->us;
-				val++;val++;
-				clutDepthB = val->us;
-			} // if ...read Blue palette color descriptor
-			
-			if( clutEntryR > 256) NSLog(@"R-Palette > 256");
-			if( clutEntryG > 256) NSLog(@"G-Palette > 256");
-			if( clutEntryB > 256) NSLog(@"B-Palette > 256");
-			
-			val = Papy3GetElement (theGroupP, papSegmentedRedPaletteColorLookupTableDataGr, &nbVal, &elemType);
-			if ( val)	// SEGMENTED PALETTE - 16 BIT !
-			{
-				if (clutDepthR == 16  && clutDepthG == 16  && clutDepthB == 16)
-				{
-					long length, xx, xxindex, jj;
-					
-					if( shortRed) free( shortRed);
-					if( shortGreen) free( shortGreen);
-					if( shortBlue) free( shortBlue);
-					
-					shortRed = malloc( 65536L * sizeof( unsigned short));
-					shortGreen = malloc( 65536L * sizeof( unsigned short));
-					shortBlue = malloc( 65536L * sizeof( unsigned short));
-					
-					// extract the RED palette clut data
-					val = Papy3GetElement (theGroupP, papSegmentedRedPaletteColorLookupTableDataGr, &nbVal, &elemType);
-					if ( val && val->a && validAPointer( elemType))
-					{
-						unsigned short  *ptrs =  (unsigned short*) val->a;
-						nbVal = theGroupP[ papSegmentedRedPaletteColorLookupTableDataGr].length / 2;
-						
-//						NSLog(@"red");
-						
-						xxindex = 0;
-						for( jj = 0; jj < nbVal;jj++)
-						{
-//							NSLog(@"val: %d", ptrs[jj]);
-							switch( ptrs[jj])
-							{
-								case 0:	// Discrete
-									jj++;
-									length = ptrs[jj];
-	//								NSLog(@"length: %d", length);
-									jj++;
-									for( xx = xxindex; xxindex < xx + length; xxindex++)
-									{
-										shortRed[ xxindex] = ptrs[ jj++];
-//										if( xxindex < 256) NSLog(@"%d", shortRed[ xxindex]);
-									}
-									jj--;
-									break;
-									
-									case 1:	// Linear
-									jj++;
-									length = ptrs[jj];
-									for( xx = xxindex; xxindex < xx + length; xxindex++)
-									{
-										shortRed[ xxindex] = shortRed[ xx-1] + ((ptrs[jj+1] - shortRed[ xx-1]) * (1+xxindex - xx)) / (length);
-										//		if( xxindex < 256) NSLog(@"%d", shortRed[ xxindex]);
-									}
-									jj ++;
-									break;
-									
-									case 2: // Indirect
-									NSLog(@"indirect not supported");
-									jj++;
-									length = ptrs[jj];
-									
-									jj += 2;
-									break;
-									
-									default:
-									NSLog(@"Error, Error, OsiriX will soon crash...");
-									break;
-							}
-						}
-						found16 = YES; 	// this is used to let us know we have to look for the other element */
-					}//endif
-					
-					// extract the GREEN palette clut data
-					val = Papy3GetElement (theGroupP, papSegmentedGreenPaletteColorLookupTableDataGr, &nbVal, &elemType);
-					if ( val && val->a && validAPointer( elemType))
-					{
-						unsigned short  *ptrs =  (unsigned short*) val->a;
-						nbVal = theGroupP[ papSegmentedGreenPaletteColorLookupTableDataGr].length / 2;
-						
-//						NSLog(@"green");
-						
-						xxindex = 0;
-						for( jj = 0; jj < nbVal; jj++)
-						{
-							switch( ptrs[jj])
-							{
-								case 0:	// Discrete
-									jj++;
-									length = ptrs[jj];
-									jj++;
-									for( xx = xxindex; xxindex < xx + length; xxindex++)
-									{
-										shortGreen[ xxindex] = ptrs[ jj++];
-										//			if( xxindex < 256) NSLog(@"%d", shortGreen[ xxindex]);
-									}
-									jj--;
-									break;
-									
-									case 1:	// Linear
-									jj++;
-									length = ptrs[jj];
-									for( xx = xxindex; xxindex < xx + length; xxindex++)
-									{
-										shortGreen[ xxindex] = shortGreen[ xx-1] + ((ptrs[jj+1] - shortGreen[ xx-1]) * (1+xxindex - xx)) / (length);
-										//	if( xxindex < 256) NSLog(@"%d", shortGreen[ xxindex]);
-									}
-									jj ++;
-									break;
-									
-									case 2: // Indirect
-									NSLog(@"indirect not supported");
-									jj++;
-									length = ptrs[jj];
-									
-									jj += 2;
-									break;
-									
-									default:
-									NSLog(@"Error, Error, OsiriX will soon crash...");
-									break;
-							}
-						}
-						found16 = YES; 	// this is used to let us know we have to look for the other element */
-//						NSLog(@"%d", xxindex);
-					}//endif
-					
-					// extract the BLUE palette clut data
-					val = Papy3GetElement (theGroupP, papSegmentedBluePaletteColorLookupTableDataGr, &nbVal, &elemType);
-					if ( val && val->a && validAPointer( elemType))
-					{
-						unsigned short  *ptrs =  (unsigned short*) val->a;
-						nbVal = theGroupP[ papSegmentedBluePaletteColorLookupTableDataGr].length / 2;
-						
-//						NSLog(@"blue");
-						
-						xxindex = 0;
-						for( jj = 0; jj < nbVal; jj++)
-						{
-							switch( ptrs[jj])
-							{
-								case 0:	// Discrete
-									jj++;
-									length = ptrs[jj];
-									jj++;
-									for( xx = xxindex; xxindex < xx + length; xxindex++)
-									{
-										shortBlue[ xxindex] = ptrs[ jj++];
-										//			if( xxindex < 256) NSLog(@"%d", shortBlue[ xxindex]);
-									}
-									jj--;
-									break;
-									
-									case 1:	// Linear
-									jj++;
-									length = ptrs[jj];
-									for( xx = xxindex; xxindex < xx + length; xxindex++)
-									{
-										shortBlue[ xxindex] = shortBlue[ xx-1] + ((ptrs[jj+1] - shortBlue[ xx-1]) * (xxindex - xx + 1)) / (length);
-										//			if( xxindex < 256) NSLog(@"%d", shortBlue[ xxindex]);
-									}
-									jj ++;
-									break;
-									
-									case 2: // Indirect
-									NSLog(@"indirect not supported");
-									jj++;
-									length = ptrs[jj];
-									
-									jj += 2;
-									break;
-									
-									default:
-									NSLog(@"Error, Error, OsiriX will soon crash...");
-									break;
-							}
-						}
-						found16 = YES; 	// this is used to let us know we have to look for the other element */
-//						NSLog(@"%d", xxindex);
-					}//endif
-					
-					for( jj = 0; jj < 65535; jj++)
-					{
-						shortRed[jj] =shortRed[jj]>>8;
-						shortGreen[jj] =shortGreen[jj]>>8;
-						shortBlue[jj] =shortBlue[jj]>>8;
-					}
-				}
-				else if (clutDepthR == 8  && clutDepthG == 8  && clutDepthB == 8)
-				{
-					NSLog(@"Segmented palettes for 8 bits ??");
-				}
-				else
-				{
-					NSLog(@"Dont know this kind of DICOM CLUT...");
-				}
-			}
-			// EXTRACT THE PALETTE data only if there is 256 entries and depth is 16 bits
-			else if (clutDepthR == 16  && clutDepthG == 16  && clutDepthB == 16)
-			{
-				if( clutEntryR == 0 && clutEntryG == 0 && clutEntryB == 0)
-				{
-//					NSLog( @"****** clutEntryR == 0 && clutEntryG == 0 && clutEntryB == 0");
-					clutEntryR = 65535;
-					clutEntryG = 65535;
-					clutEntryB = 65535;
-				}
-				
-				// extract the RED palette clut data
-				val = Papy3GetElement (theGroupP, papRedPaletteCLUTDataGr, &nbVal, &elemType);
-				if ( val && val->a && validAPointer( elemType))
-				{
-					unsigned short  *ptrs =  (unsigned short*) val->a;
-					for ( int j = 0; j < clutEntryR; j++, ptrs++) clutRed [j] = (int) (*ptrs/256);
-					
-					found = YES; 	// this is used to let us know we have to look for the other element */
-				}//endif
-				
-				// extract the GREEN palette clut data
-				val = Papy3GetElement (theGroupP, papGreenPaletteCLUTDataGr, &nbVal, &elemType);
-				if ( val && val->a && validAPointer( elemType))
-				{
-					unsigned short  *ptrs = (unsigned short*) val->a;
-					for ( int j = 0; j < clutEntryG; j++, ptrs++) clutGreen [j] = (int) (*ptrs/256);
-				}
-				// extract the BLUE palette clut data
-				val = Papy3GetElement (theGroupP, papBluePaletteCLUTDataGr, &nbVal, &elemType);
-				if ( val && val->a && validAPointer( elemType))
-				{
-					unsigned short  *ptrs =  (unsigned short*) val->a;
-					for ( int j = 0; j < clutEntryB; j++, ptrs++) clutBlue [j] = (int) (*ptrs/256);
-				}
-			} // if ...the palette has 256 entries and thus we extract the clut datas
-			else if (clutDepthR == 8  && clutDepthG == 8  && clutDepthB == 8)
-			{
-				// extract the RED palette clut data
-				val = Papy3GetElement (theGroupP, papRedPaletteCLUTDataGr, &nbVal, &elemType);
-				if ( val && val->a && validAPointer( elemType))
-				{
-					unsigned short  *ptrs =  (unsigned short*) val->a;
-					for ( int j = 0; j < clutEntryR; j++, ptrs++) clutRed [j] = (int) (*ptrs);
-					found = YES; 	// this is used to let us know we have to look for the other element */
-				}//endif
-				
-				// extract the GREEN palette clut data
-				val = Papy3GetElement (theGroupP, papGreenPaletteCLUTDataGr, &nbVal, &elemType);
-				if ( val && val->a && validAPointer( elemType))
-				{
-					unsigned short  *ptrs =  (unsigned short*) val->a;
-					for ( int j = 0; j < clutEntryG; j++, ptrs++) clutGreen [j] = (int) (*ptrs);
-				}
-				// extract the BLUE palette clut data
-				val = Papy3GetElement (theGroupP, papBluePaletteCLUTDataGr, &nbVal, &elemType);
-				if ( val && val->a && validAPointer( elemType))
-				{
-					unsigned short  *ptrs =  (unsigned short*) val->a;
-					for ( int j = 0; j < clutEntryB; j++, ptrs++) clutBlue [j] = (int) (*ptrs);
-				}
-			}
-			else
-			{
-				NSLog(@"Dont know this kind of DICOM CLUT...");
-			}
-			
-			// let the rest of the routine know that it should set the clut
-			if (found) fSetClut = YES;
-			if (found16) fSetClut16 = YES;
-		} // endif ...extraction of the color palette
-	}
-	
-    val = Papy3GetElement (theGroupP, papVOILUTSequenceGr, &pos, &elemType);
-    
-    // Loop over sequence
-    
-    if( val && elemType == SQ && val->sq && pos >= 1)
-    {
-        Papy_List	*dcmList = val->sq->object->item;
-        if (dcmList != NULL)	// We use ONLY the first VOILut available
-        {
-            SElement *gr = (SElement *)dcmList->object->group;
-            if ( gr->group == 0x0028)
-            {
-                
-                val = Papy3GetElement (gr, papLUTDescriptorGr, &pos, &elemType);
-                if( val)
-                {
-                    VOILUT_number = val->us;		val++;
-                    VOILUT_first = val->ss;			val++;	// By definition it should be us, but some images with neg values expect a ss
-                    VOILUT_depth = val->us;			val++;
-                }
-                
-                val = Papy3GetElement (gr, papLUTDataGr, &pos, &elemType);
-                if( val)
-                {
-                    VOILUT_number = pos;
-                    
-                    if( VOILUT_table) free( VOILUT_table);
-                    VOILUT_table = malloc( sizeof(unsigned int) * VOILUT_number);
-                    for ( int j = 0; j < VOILUT_number; j++)
-                    {
-                        VOILUT_table [j] = (unsigned int) val->us;			val++;
-                    }
-                }
-            }
-        }
-    }
-	
-	[PapyrusLock unlock];
-}
-
-- (void)papyLoadCodeSequenceMacro:(DCMCodeSequenceMacro*)csm from:(papObject*)object
-{
-    UValue_T* val;
-    PapyULong nbVal;
-	int elemType;
-    for (Papy_List* l = object->item; l; l = l->next) {
-        SElement* group = (SElement*)l->object->group;
-        switch (group->group) {
-            case 0x0008: {
-                // (0008,0100) CodeValue 1 SH [1]
-                val = Papy3GetElement(group, papCodeValueGr, &nbVal, &elemType);
-                if (val && val->a && validAPointer(elemType)) csm.codeValue = [NSString stringWithCString:val->a encoding:NSISOLatin1StringEncoding];
-                
-                // (0008,0102) CodingSchemeDesignator 1 SH [1]
-                val = Papy3GetElement(group, papCodingSchemeDesignatorGr, &nbVal, &elemType);
-                if (val && val->a && validAPointer(elemType)) csm.codingSchemeDesignator = [NSString stringWithCString:val->a encoding:NSISOLatin1StringEncoding];
-
-                // (0008,0103) CodingSchemeVersion 1C SH [1]
-                val = Papy3GetElement(group, papCodingSchemeVersionGr, &nbVal, &elemType);
-                if (val && val->a && validAPointer(elemType)) csm.codingSchemeVersion = [NSString stringWithCString:val->a encoding:NSISOLatin1StringEncoding];
-                
-                // (0008,0104) CodeMeaning 1  LO [1]
-                val = Papy3GetElement(group, papCodeMeaningGr, &nbVal, &elemType);
-                if (val && val->a && validAPointer(elemType)) csm.codeMeaning = [NSString stringWithCString:val->a encoding:NSISOLatin1StringEncoding];
-                
-                // (0008,010F) ContextIdentifier 3 CS [1]
-                val = Papy3GetElement(group, papContextIdentifierGr, &nbVal, &elemType);
-                if (val && val->a && validAPointer(elemType)) csm.contextIdentifier = [NSString stringWithCString:val->a encoding:NSISOLatin1StringEncoding];
-                
-                // (0008,0117) ContextUID 3 UI [1]
-                val = Papy3GetElement(group, papContextIdentifierGr, &nbVal, &elemType);
-                if (val && val->a && validAPointer(elemType)) csm.contextUID = [NSString stringWithCString:val->a encoding:NSISOLatin1StringEncoding];
-                
-                // (0008,0105) MappingResource 1C CS [1]
-                val = Papy3GetElement(group, papMappingResourceGr, &nbVal, &elemType);
-                if (val && val->a && validAPointer(elemType)) [csm setMappingResourceCS:val->a];
-                
-                // (0008,0106) ContextGroupVersion 1C DT [1]
-                val = Papy3GetElement(group, papContextGroupVersionGr, &nbVal, &elemType);
-                if (val && val->a && validAPointer(elemType)) csm.contextGroupVersion = [DCMCalendarDate dicomDateTime:[NSString stringWithCString:val->a encoding:NSISOLatin1StringEncoding]];
-                
-                // (0008,010B) ContextGroupExtensionFlag 3 CS [1]
-                // val = Papy3GetElement(group, ???, &nbVal, &elemType); // Papyrus doesn't support ContextGroupExtensionFlag
-                
-                // (0008,0107) ContextGroupLocalVersion 1C DT [1]
-                val = Papy3GetElement(group, papContextgroupLocalVersionGr, &nbVal, &elemType);
-                if (val && val->a && validAPointer(elemType)) csm.contextGroupLocalVersion = [DCMCalendarDate dicomDateTime:[NSString stringWithCString:val->a encoding:NSISOLatin1StringEncoding]];
-                
-                // (0008,010D) ContextGroupExtensionCreatorUID 1C UI [1]
-                // val = Papy3GetElement(group, papCodeValueGr, &nbVal, &elemType); // Papyrus doesn't support ContextGroupExtensionCreatorUID
-                
-            } break;
-        }
-    }
-}
-
-- (void)papyLoadSOPInstanceReferenceMacro:(DCMSOPInstanceReferenceMacro*)sirm from:(papObject*)object
-{
-    UValue_T* val;
-    PapyULong nbVal;
-	int elemType;
-    for (Papy_List* l = object->item; l; l = l->next)
-    {
-        SElement* group = (SElement*)l->object->group;
-        switch (group->group)
-        {
-            case 0x0008:
-                // (0008,1150) ReferencedSOPClassUID 1 UI [1]
-                val = Papy3GetElement(group, papReferencedSOPClassUID, &nbVal, &elemType);
-                if (val && val->a && validAPointer(elemType)) sirm.referencedSOPClassUID = [NSString stringWithCString:val->a encoding:NSISOLatin1StringEncoding];
-
-                // (0008,1155) ReferencedSOPInstanceUID 1 UI [1]
-                val = Papy3GetElement(group, papContextIdentifierGr, &nbVal, &elemType);
-                if (val && val->a && validAPointer(elemType)) sirm.referencedSOPInstanceUID = [NSString stringWithCString:val->a encoding:NSISOLatin1StringEncoding];
-
-            break;
-        }
-    }
-}
-
 - (BOOL) loadDICOMPapyrus
 {
-	int				elemType;
-	PapyShort		imageNb,  err = 0;
-	PapyULong		nbVal, i, pos;
-	SElement		*theGroupP;
-	UValue_T		*val;
-	BOOL			returnValue = NO;
-	
-	clutRed = nil;
-	clutGreen = nil;
-	clutBlue = nil;
-	
-	fSetClut = NO;
-	fSetClut16 = NO;
-	
-	fPlanarConf = 0;
-	pixelRatio = 1.0;
-	
-	orientation[ 0] = 0;	orientation[ 1] = 0;	orientation[ 2] = 0;
-	orientation[ 3] = 0;	orientation[ 4] = 0;	orientation[ 5] = 0;
-	
-	sliceThickness = 0;
-	spacingBetweenSlices = 0;
-	repetitiontime = 0;
-	echotime = 0;
-	flipAngle = 0;
-	viewPosition = 0;
-	patientPosition = 0;
-	width = height = 0;
-
-	originX = 0;
-	originY = 0;
-	originZ = 0;
-	
-	if( purgeCacheLock == nil)
-		purgeCacheLock = [[NSConditionLock alloc] initWithCondition: 0];
-	
-	[purgeCacheLock lock];
-	[purgeCacheLock unlockWithCondition: [purgeCacheLock condition]+1];
-    
-    //NSString* specificCharacterSet = nil; // hopefully Papyrus3 does string decoding with UValue_T->a
-	
-	@try
-	{
-		if( [self getPapyGroup: 0])	// This group is mandatory...
-		{
-			UValue_T *val3, *tmpVal3;
-			
-			self.modalityString = nil;
-			
-			imageNb = 1 + frameNo; 
-			
-			pixelSpacingX = 0;
-			pixelSpacingY = 0;
-            estimatedRadiographicMagnificationFactor = 0;
-			
-			offset = 0.0;
-			slope = 1.0;
-			
-			theGroupP = (SElement*) [self getPapyGroup: 0x0008];
-			if( theGroupP)
-			{
-                /*val = Papy3GetElement (theGroupP, papSpecificCharacterSetGr, &nbVal, &elemType);
-                if (val && val->a)
-                    specificCharacterSet = [NSString stringWithCString:val->a DICOMEncoding:specificCharacterSet]; // specificCharacterSet is initially nil*/
-                
-                val = Papy3GetElement (theGroupP, papRecommendedDisplayFrameRateGr, &nbVal, &elemType);
-				if ( val && val->a && validAPointer( elemType)) cineRate = atof( val->a);	//[[NSString stringWithFormat:@"%0.1f", ] floatValue];
-				
-				int priority[ 8];
-
-				if( gSUVAcquisitionTimeField == 0) // Prefer SeriesTime
-				{
-					priority[ 0] = papSeriesDateGr;			priority[ 1] = papSeriesTimeGr;
-					priority[ 2] = papAcquisitionDateGr;	priority[ 3] = papAcquisitionTimeGr;
-					priority[ 4] = papImageDateGr;			priority[ 5] = papImageTimeGr;
-					priority[ 6] = papStudyDateGr;			priority[ 7] = papStudyTimeGr;
-				}
-				
-				if( gSUVAcquisitionTimeField == 1) // Prefer AcquisitionTime
-				{
-					priority[ 0] = papAcquisitionDateGr;	priority[ 1] = papAcquisitionTimeGr;
-					priority[ 2] = papSeriesDateGr;			priority[ 3] = papSeriesTimeGr;
-					priority[ 4] = papImageDateGr;			priority[ 5] = papImageTimeGr;
-					priority[ 6] = papStudyDateGr;			priority[ 7] = papStudyTimeGr;
-				}
-				
-				if( gSUVAcquisitionTimeField == 2) // Prefer ContentTime
-				{
-					priority[ 0] = papImageDateGr;			priority[ 1] = papImageTimeGr;
-					priority[ 2] = papSeriesDateGr;			priority[ 3] = papSeriesTimeGr;
-					priority[ 4] = papAcquisitionDateGr;	priority[ 5] = papAcquisitionTimeGr;
-					priority[ 6] = papStudyDateGr;			priority[ 7] = papStudyTimeGr;
-				}
-				
-				if( gSUVAcquisitionTimeField == 3) // Prefer StudyTime
-				{
-					priority[ 0] = papStudyDateGr;			priority[ 1] = papStudyTimeGr;
-					priority[ 2] = papSeriesDateGr;			priority[ 3] = papSeriesTimeGr;
-					priority[ 4] = papAcquisitionDateGr;	priority[ 5] = papAcquisitionTimeGr;
-					priority[ 6] = papImageDateGr;			priority[ 7] = papImageTimeGr;
-				}
-				
-				NSString *preferredTime = nil, *preferredDate = nil;
-				
-				for( int v = 0; v < 8;)
-				{
-					if( preferredDate == nil && (val = Papy3GetElement (theGroupP, priority[ v], &nbVal, &elemType)))
-					{
-						if ( val && val->a && validAPointer( elemType))
-						{
-							preferredDate = [NSString stringWithCString:val->a encoding: NSASCIIStringEncoding];
-							if( [preferredDate length] != 6) preferredDate = [preferredDate stringByReplacingOccurrencesOfString:@"." withString:@""];
-						}
-					}
-					v++;
-					
-					if( preferredTime == nil && (val = Papy3GetElement (theGroupP, priority[ v], &nbVal, &elemType)))
-					{
-						if ( val && val->a && validAPointer( elemType))
-							preferredTime = [NSString stringWithCString:val->a encoding: NSASCIIStringEncoding];
-					}
-					v++;
-				}
-				
-				if( preferredTime && preferredDate)
-				{
-					NSString *completeDate = [preferredDate stringByAppendingString: preferredTime];
-					
-					if( [preferredTime length] >= 6)
-						acquisitionTime = [[NSCalendarDate alloc] initWithString:completeDate calendarFormat:@"%Y%m%d%H%M%S"];
-					else
-						acquisitionTime = [[NSCalendarDate alloc] initWithString:completeDate calendarFormat:@"%Y%m%d%H%M"];
-				
-					acquisitionDate = [preferredDate copy];
-				}
-				
-                val = Papy3GetElement (theGroupP, papReferencedSOPInstanceUID8Gr, &nbVal, &elemType);
-				if ( val && val->a && validAPointer( elemType)) self.referencedSOPInstanceUID = [NSString stringWithCString:val->a encoding: NSASCIIStringEncoding];
-                
-				val = Papy3GetElement (theGroupP, papModalityGr, &nbVal, &elemType);
-				if ( val && val->a && validAPointer( elemType)) self.modalityString = [NSString stringWithCString:val->a encoding: NSASCIIStringEncoding];
-				
-				val = Papy3GetElement (theGroupP, papSOPClassUIDGr, &nbVal, &elemType);
-				if ( val && val->a && validAPointer( elemType)) self.SOPClassUID = [NSString stringWithCString:val->a encoding: NSASCIIStringEncoding];
-
-                if ((val = Papy3GetElement(theGroupP, papImageTypeGr, &nbVal, &elemType))) {
-                    NSMutableArray* imageTypeArray = [NSMutableArray array];
-                    
-                    for (int i = 0; i < nbVal; ++i)
-                        [imageTypeArray addObject:[NSString stringWithCString:val++->a encoding:NSASCIIStringEncoding]];
-                
-                    self.imageType = [imageTypeArray componentsJoinedByString:@"\\"];
-                }
-            }
-			
-			theGroupP = (SElement*) [self getPapyGroup: 0x0010];
-			if( theGroupP)
-			{
-				val = Papy3GetElement (theGroupP, papPatientsWeightGr, &nbVal, &elemType);
-				if ( val && val->a && validAPointer( elemType)) patientsWeight = atof( val->a);
-				else patientsWeight = 0;
-			}
-			
-			theGroupP = (SElement*) [self getPapyGroup: 0x0018];
-			if( theGroupP)
-				[self papyLoadGroup0x0018: theGroupP];
-				
-			theGroupP = (SElement*) [self getPapyGroup: 0x0020];
-			if( theGroupP)
-				[self papyLoadGroup0x0020: theGroupP];
-			
-			theGroupP = (SElement*) [self getPapyGroup: 0x0028];
-			if( theGroupP || [SOPClassUID hasPrefix: @"1.2.840.10008.5.1.4.1.1.104."] || [SOPClassUID hasPrefix: @"1.2.840.10008.5.1.4.1.1.88"] || [DCMAbstractSyntaxUID isNonImageStorage: SOPClassUID] || [DCMAbstractSyntaxUID isWaveform:SOPClassUID]) // This group is MANDATORY... or DICOM SR / PDF / Spectro / Waveform
-			{
-				if( theGroupP)
-				   [self papyLoadGroup0x0028: theGroupP];
-				
-                NSData *pdfData = nil;
-                theGroupP = (SElement*) [self getPapyGroup: 0x0042];
-                if( theGroupP)
-                {
-                    SElement *element = theGroupP + papEncapsulatedDocumentGr;
-                    
-                    if( element->nb_val > 0)
-                        pdfData = [NSData dataWithBytes: element->value->a length: element->length];
-                }
-                
-				#pragma mark SUV
-				
-				// Get values needed for SUV calcs:
-				theGroupP = (SElement*) [self getPapyGroup: 0x0054];
-				if( theGroupP)
-				{
-					val = Papy3GetElement (theGroupP, papUnitsGr, &pos, &elemType);
-					if( val && val->a && validAPointer( elemType)) units = [[NSString stringWithCString:val->a encoding: NSISOLatin1StringEncoding] retain];
-					else units = nil;
-                    
-					val = Papy3GetElement (theGroupP, papDecayCorrectionGr, &pos, &elemType);
-					if( val && val->a && validAPointer( elemType)) decayCorrection = [[NSString stringWithCString:val->a encoding: NSISOLatin1StringEncoding] retain];
-					else decayCorrection = nil;
-					
-	//				val = Papy3GetElement (theGroupP, papDecayFactorGr, &pos, &elemType);
-	//				if( val) decayFactor = atof( val->a);
-	//				else decayFactor = 1.0;
-					decayFactor = 1.0;
-					
-					val = Papy3GetElement (theGroupP, papFrameReferenceTimeGr, &pos, &elemType);
-					if( val && val->a && validAPointer( elemType)) frameReferenceTime = atof( val->a);
-					else frameReferenceTime = 0.0;
-					
-					val = Papy3GetElement (theGroupP, papRadiopharmaceuticalInformationSequenceGr, &pos, &elemType);
-					
-					// Loop over sequence to find injected dose
-					
-					if( val && elemType == SQ && val->sq && pos >= 1)
-					{
-                        Papy_List	*dcmList = val->sq;
-                        while (dcmList != NULL)
-                        {
-                            if( dcmList->object->item)
-                            {
-                                SElement *gr = (SElement *)dcmList->object->item->object->group;
-                                if ( gr->group == 0x0018)
-                                {
-                                    val = Papy3GetElement (gr, papRadionuclideTotalDoseGr, &pos, &elemType);
-                                    if( val && val->a && validAPointer( elemType))
-                                        radionuclideTotalDose = atof( val->a);
-                                    else
-                                        radionuclideTotalDose = 0.0;
-                                    
-                                    val = Papy3GetElement (gr, papRadiopharmaceuticalStartTimeGr, &pos, &elemType);
-                                    if( val && val->a && validAPointer( elemType) && acquisitionDate)
-                                    {
-                                        NSString *pharmaTime = [NSString stringWithCString:val->a encoding: NSASCIIStringEncoding];
-                                        NSString *completeDate = [acquisitionDate stringByAppendingString: pharmaTime];
-                                        
-                                        if( [pharmaTime length] >= 6)
-                                            radiopharmaceuticalStartTime = [[NSCalendarDate alloc] initWithString: completeDate calendarFormat:@"%Y%m%d%H%M%S"];
-                                        else
-                                            radiopharmaceuticalStartTime = [[NSCalendarDate alloc] initWithString: completeDate calendarFormat:@"%Y%m%d%H%M"];
-                                    }
-                                    
-                                    val = Papy3GetElement (gr, papRadionuclideHalfLifeGr, &pos, &elemType);
-                                    if( val && val->a && validAPointer( elemType))
-                                        halflife = atof( val->a);
-                                    else
-                                        halflife = 0;
-                                        
-                                    break;
-                                }
-                            }
-                            dcmList = dcmList->next;
-                        }
-						
-						[self computeTotalDoseCorrected];
-						
-						// End of SUV required values
-					}
-					
-					val = Papy3GetElement (theGroupP, papDetectorInformationSequenceGr, &pos, &elemType);
-					if( val && elemType == SQ && val->sq && pos >= 1)
-                    {
-						{
-							Papy_List *dcmList = val->sq->object->item;
-							while (dcmList != NULL)
-							{
-								SElement * gr = (SElement *) dcmList->object->group;
-									
-								if( gr)
-								{
-									if( gr->group == 0x0020)
-									{
-										val = Papy3GetElement (gr, papImagePositionPatientGr, &nbVal, &elemType);
-										if( val && nbVal == 3)
-										{
-											originX = atof( val++->a);
-                                            originY = atof( val++->a);
-                                            originZ = atof( val++->a);
-											
-											isOriginDefined = YES;
-										}
-										
-										if( spacingBetweenSlices)
-											originZ += frameNo * spacingBetweenSlices;
-										else
-											originZ += frameNo * sliceThickness;
-										
-										val = Papy3GetElement (gr, papImageOrientationPatientGr, &nbVal, &elemType);
-										if( val && nbVal == 6)
-										{
-											BOOL equalZero = YES;
-											
-											tmpVal3 = val;
-											for ( int j = 0; j < nbVal; j++)
-												if( atof( tmpVal3++->a) != 0) equalZero = NO;
-											
-											if( equalZero == NO)
-											{
-												orientation[ 0] = 0;	orientation[ 1] = 0;	orientation[ 2] = 0;
-												orientation[ 3] = 0;	orientation[ 4] = 0;	orientation[ 5] = 0;
-												
-												tmpVal3 = val;
-												for ( int j = 0; j < nbVal; j++)
-													orientation[ j]  = atof( tmpVal3++->a);
-												
-//												orientation[ 0] = 1;	orientation[ 1] = 0;	orientation[ 2] = 0; tests, force axial matrix
-//												orientation[ 3] = 0;	orientation[ 4] = 1;	orientation[ 5] = 0;
-											}
-											else // doesnt the root Image Orientation contains valid data? if not use the normal vector
-											{
-												equalZero = YES;
-												for ( int j = 0; j < 6; j++)
-													if( orientation[ j] != 0) equalZero = NO;
-												
-												if( equalZero)
-												{
-													orientation[ 0] = 1;	orientation[ 1] = 0;	orientation[ 2] = 0;
-													orientation[ 3] = 0;	orientation[ 4] = 1;	orientation[ 5] = 0;
-												}
-											}
-										}
-										break;
-									}
-								}
-								dcmList = dcmList->next;
-							}
-						}
-						
-						[self computeTotalDoseCorrected];
-						
-						// End of SUV required values
-					}
-				}
-				
-				// End SUV			
-				
-				#pragma mark MR/CT/US multiframe		
-				// Is it a new MR/CT/US multi-frame exam?
-				
-				SElement *groupOverlay = (SElement*) [self getPapyGroup: 0x5200];
-				if( groupOverlay)
-				{
-					// ****** ****** ****** ************************************************************************
-					// SHARED FRAME
-					// ****** ****** ****** ************************************************************************
-					
-					val = Papy3GetElement (groupOverlay, papSharedFunctionalGroupsSequence, &nbVal, &elemType);
-					
-					// there is an element
-					if( val && elemType == SQ && val->sq && nbVal >= 1)
-                    {
-						{
-							// get a pointer to the first element of the list
-							Papy_List *dcmList = val->sq->object->item;
-							
-							// loop through the elements of the sequence
-							while (dcmList != NULL)
-							{
-								SElement * gr = (SElement *) dcmList->object->group;
-								
-								switch( gr->group)
-								{
-									case 0x0018:
-										val3 = Papy3GetElement (gr, papMRTimingAndRelatedParametersSequence, &nbVal, &elemType);
-										if (val3 != NULL && nbVal >= 1)
-										{
-											if (val3->sq)
-											{
-												Papy_List *PixelMatrixSeq = val3->sq->object->item;
-												
-												while (PixelMatrixSeq)
-												{
-													SElement * gr = (SElement *) PixelMatrixSeq->object->group;
-													
-													switch( gr->group)
-													{
-														case 0x0018: [self papyLoadGroup0x0018: gr]; break;
-													}
-													PixelMatrixSeq = PixelMatrixSeq->next;
-												}
-											}
-										}
-									break;
-									
-									case 0x0020:
-										val3 = Papy3GetElement (gr, papPlaneOrientationSequence, &nbVal, &elemType);
-										if (val3 != NULL && nbVal >= 1)
-										{
-											// there is a sequence
-											if (val3->sq)
-											{
-												Papy_List *PixelMatrixSeq = val3->sq->object->item;
-												
-												// loop through the elements of the sequence
-												while (PixelMatrixSeq)
-												{
-													SElement * gr = (SElement *) PixelMatrixSeq->object->group;
-													
-													switch( gr->group)
-													{
-														case 0x0020: [self papyLoadGroup0x0020: gr]; break;
-													}
-													
-													// get the next element of the list
-													PixelMatrixSeq = PixelMatrixSeq->next;
-												}
-											}
-										}
-                                        
-                                        val3 = Papy3GetElement (gr, papPlanePositionVolumeSequence, &nbVal, &elemType);
-										if (val3 != NULL && nbVal >= 1)
-										{
-											// there is a sequence
-											if (val3->sq)
-											{
-												Papy_List *PixelMatrixSeq = val3->sq->object->item;
-												
-												// loop through the elements of the sequence
-												while (PixelMatrixSeq)
-												{
-													SElement * gr = (SElement *) PixelMatrixSeq->object->group;
-													
-													switch( gr->group)
-													{
-														case 0x0020: [self papyLoadGroup0x0020: gr]; break;
-													}
-													
-													// get the next element of the list
-													PixelMatrixSeq = PixelMatrixSeq->next;
-												}
-											}
-										}
-									break;
-                                    
-                                    case 0x0022:
-//                                        papOphthalmicFrameLocationSequence
-//                                        papReferenceCoordinates
-//                                        papReferencedSOPInstanceUID
-                                    break;
-                                        
-									case 0x0028:
-										val3 = Papy3GetElement (gr, papPixelMatrixSequence, &nbVal, &elemType);
-										if (val3 != NULL && nbVal >= 1)
-										{
-											// there is a sequence
-											if (val3->sq != NULL)
-											{
-												Papy_List	  *PixelMatrixSeq = val3->sq->object->item;
-												
-												// loop through the elements of the sequence
-												while (PixelMatrixSeq != NULL)
-												{
-													SElement * gr = (SElement *) PixelMatrixSeq->object->group;
-													
-													switch( gr->group)
-													{
-														case 0x0018: [self papyLoadGroup0x0018: gr]; break;
-														case 0x0028: [self papyLoadGroup0x0028: gr]; break;
-													}
-													
-													// get the next element of the list
-													PixelMatrixSeq = PixelMatrixSeq->next;
-												}
-											}
-										}
-										
-										val3 = Papy3GetElement (gr, papPixelValueTransformationSequence, &nbVal, &elemType);
-										if (val3 != NULL && nbVal >= 1)
-										{
-											// there is a sequence
-											if (val3->sq)
-											{
-												// get a pointer to the first element of the list
-												Papy_List *PixelMatrixSeq = val3->sq->object->item;
-												
-												// loop through the elements of the sequence
-												while (PixelMatrixSeq)
-												{
-													SElement * gr = (SElement *) PixelMatrixSeq->object->group;
-													
-													switch( gr->group)
-													{
-														case 0x0028: [self papyLoadGroup0x0028: gr]; break;
-													}
-													
-													// get the next element of the list
-													PixelMatrixSeq = PixelMatrixSeq->next;
-												}
-											}
-										}
-										
-									break;
-								}
-								
-								// get the next element of the list
-								dcmList = dcmList->next;
-							} // while ...loop through the sequence
-						} // if ...there is a sequence of groups
-					} // if ...val is not NULL
-					
-		#pragma mark code for each frame				
-					// ****** ****** ****** ************************************************************************
-					// PER FRAME
-					// ****** ****** ****** ************************************************************************
-					
-					long frameCount = 0;
-					
-					val = Papy3GetElement (groupOverlay, papPerFrameFunctionalGroupsSequence, &nbVal, &elemType);
-					
-					// there is an element
-					if( val && elemType == SQ && val->sq && nbVal >= 1)
-                    {
-						{
-							// get a pointer to the first element of the list
-							Papy_List *dcmList = val->sq;
-							
-							// loop through the elements of the sequence
-							while (dcmList)
-							{
-								if( dcmList->object->item)
-								{
-									if( frameCount == imageNb-1)
-									{
-										Papy_List *groupsForFrame = dcmList->object->item;
-										
-										while( groupsForFrame)
-										{
-											if( groupsForFrame->object->group)
-											{
-												SElement * gr = (SElement *) groupsForFrame->object->group;
-												
-												switch( gr->group)
-												{
-													case 0x0008:
-                                                        if ((val = Papy3GetElement(theGroupP, papImageTypeGr, &nbVal, &elemType))) {
-                                                            NSMutableArray* imageTypeArray = [NSMutableArray array];
-                                                            
-                                                            for (int i = 0; i < nbVal; ++i)
-                                                                [imageTypeArray addObject:[NSString stringWithCString:val++->a encoding:NSASCIIStringEncoding]];
-                                                            
-                                                            self.imageType = [imageTypeArray componentsJoinedByString:@"\\"];
-                                                        }
-                                                    break;
-                                                        
-                                                    case 0x0018:
-														val = Papy3GetElement (gr, papMREchoSequence, &nbVal, &elemType);
-                                                        // there is a sequence
-                                                        if( val && elemType == SQ && val->sq && nbVal >= 1)
-                                                        {
-                                                            // get a pointer to the first element of the list
-                                                            Papy_List *seq = val->sq->object->item;
-                                                            
-                                                            // loop through the elements of the sequence
-                                                            while (seq)
-                                                            {
-                                                                SElement * gr20 = (SElement *) seq->object->group;
-                                                                
-                                                                switch( gr20->group)
-                                                                {
-                                                                    case 0x0018: [self papyLoadGroup0x0018: gr20]; break;
-                                                                }
-                                                                
-                                                                // get the next element of the list
-                                                                seq = seq->next;
-                                                            }
-                                                        }
-													break;
-													
-													case 0x0028:
-														val = Papy3GetElement (gr, papPixelMatrixSequence, &nbVal, &elemType);
-                                                        // there is a sequence
-                                                        if( val && elemType == SQ && val->sq && nbVal >= 1)
-                                                        {
-                                                            // get a pointer to the first element of the list
-                                                            Papy_List *seq = val->sq->object->item;
-                                                            
-                                                            // loop through the elements of the sequence
-                                                            while (seq)
-                                                            {
-                                                                SElement * gr20 = (SElement *) seq->object->group;
-                                                                
-                                                                switch( gr20->group)
-                                                                {
-                                                                    case 0x0018: [self papyLoadGroup0x0018: gr20]; break;
-                                                                    case 0x0028: [self papyLoadGroup0x0028: gr20]; break;
-                                                                }
-                                                                
-                                                                // get the next element of the list
-                                                                seq = seq->next;
-                                                            }
-                                                        }
-                                                        
-                                                        val = Papy3GetElement (gr, papPixelValueTransformationSequence, &nbVal, &elemType);
-                                                        // there is a sequence
-                                                        if( val && elemType == SQ && val->sq && nbVal >= 1)
-                                                        {
-                                                            // get a pointer to the first element of the list
-                                                            Papy_List *seq = val->sq->object->item;
-                                                            
-                                                            // loop through the elements of the sequence
-                                                            while (seq)
-                                                            {
-                                                                SElement * gr20 = (SElement *) seq->object->group;
-                                                                
-                                                                switch( gr20->group)
-                                                                {
-                                                                    case 0x0028: [self papyLoadGroup0x0028: gr20]; break;
-                                                                }
-                                                                
-                                                                // get the next element of the list
-                                                                seq = seq->next;
-                                                            }
-                                                        }
-													break;
-													
-													case 0x0020:
-														val = Papy3GetElement (gr, papPlanePositionSequence, &nbVal, &elemType);
-                                                        // there is a sequence
-                                                        if( val && elemType == SQ && val->sq && nbVal >= 1)
-                                                        {
-                                                            // get a pointer to the first element of the list
-                                                            Papy_List *seq = val->sq->object->item;
-                                                            
-                                                            // loop through the elements of the sequence
-                                                            while (seq)
-                                                            {
-                                                                SElement * gr = (SElement *) seq->object->group;
-                                                                
-                                                                switch( gr->group)
-                                                                {
-                                                                    case 0x0020: [self papyLoadGroup0x0020: gr]; break;
-                                                                    case 0x0028: [self papyLoadGroup0x0028: gr]; break;
-                                                                }
-                                                                
-                                                                // get the next element of the list
-                                                                seq = seq->next;
-                                                            }
-                                                        }
-														
-														val = Papy3GetElement (gr, papPlaneOrientationSequence, &nbVal, &elemType);
-                                                        // there is a sequence
-                                                        if( val && elemType == SQ && val->sq && nbVal >= 1)
-                                                        {
-                                                            // get a pointer to the first element of the list
-                                                            Papy_List *seq = val->sq->object->item;
-                                                            
-                                                            // loop through the elements of the sequence
-                                                            while (seq)
-                                                            {
-                                                                SElement * gr = (SElement *) seq->object->group;
-                                                                
-                                                                switch( gr->group)
-                                                                {
-                                                                    case 0x0020: [self papyLoadGroup0x0020: gr]; break;
-                                                                }
-                                                                
-                                                                // get the next element of the list
-                                                                seq = seq->next;
-                                                            }
-														}
-                                                        
-                                                        val = Papy3GetElement (gr, papPlanePositionVolumeSequence, &nbVal, &elemType);
-                                                        // there is a sequence
-                                                        if( val && elemType == SQ && val->sq && nbVal >= 1)
-                                                        {
-                                                            // get a pointer to the first element of the list
-                                                            Papy_List *seq = val->sq->object->item;
-                                                            
-                                                            // loop through the elements of the sequence
-                                                            while (seq)
-                                                            {
-                                                                SElement * gr = (SElement *) seq->object->group;
-                                                                
-                                                                switch( gr->group)
-                                                                {
-                                                                    case 0x0020: [self papyLoadGroup0x0020: gr]; break;
-                                                                }
-                                                                
-                                                                // get the next element of the list
-                                                                seq = seq->next;
-                                                            }
-                                                        }
-													break;
-												} // switch( gr->group)
-											} // if( groupsForFrame->object->item)
-											
-											if( groupsForFrame)
-											{
-												// get the next element of the list
-												groupsForFrame = groupsForFrame->next;
-											}
-										} // while groupsForFrame
-										
-										// STOP the loop
-										dcmList = nil;
-									} // right frame?
-								}
-								
-								if( dcmList)
-								{
-									// get the next element of the list
-									dcmList = dcmList->next;
-									
-									frameCount++;
-								}
-							} // while ...loop through the sequence
-						} // if ...there is a sequence of groups
-					} // if ...val is not NULL
-				}
-
-/*#pragma mark tag group 5400 for Waveform
-				
-				if ((theGroupP = (SElement*)[self getPapyGroup:0x5400])) {
-                    val = Papy3GetElement(theGroupP, papWaveformSequenceGr, &nbVal, &elemType);
-                    
-                    if (val && nbVal > 0 && val->sq) {
-                        DCMWaveform* w = self.waveform = [[[DCMWaveform alloc] init] autorelease];
-                        
-                        for (Papy_List* lWaveformSequence = val->sq; lWaveformSequence; lWaveformSequence = lWaveformSequence->next) {
-                            DCMWaveformSequence* ws = [w newSequence];
-//                            NSLog(@"ws...");
-                        
-                            for (Papy_List* lWaveformSequenceGroup = lWaveformSequence->object->item; lWaveformSequenceGroup; lWaveformSequenceGroup = lWaveformSequenceGroup->next) {
-                                SElement* waveformSequenceGroup = (SElement*)lWaveformSequenceGroup->object->group;
-                                
-//                                NSLog(@"... (%04X,%04X)", waveformSequenceGroup->group, waveformSequenceGroup->element);
-                                switch (waveformSequenceGroup->group) {
-                                    case 0x0018: {
-                                        // (0018,1068) MultiplexgroupTimeOffset 1C DS [1]
-                                        val = Papy3GetElement(waveformSequenceGroup, papMultiplexgroupTimeOffsetGr, &nbVal, &elemType);
-                                        if (val && val->a && validAPointer(elemType)) ws.multiplexgroupTimeOffset = strtod(val->a, NULL);
-                                        
-                                        // (0018,1069) TriggerTimeOffset 1C DS [1]
-                                        val = Papy3GetElement(waveformSequenceGroup, papTriggerTimeOffsetGr, &nbVal, &elemType);
-                                        if (val && val->a && validAPointer(elemType)) ws.triggerTimeOffset = strtod(val->a, NULL);
-                                        
-                                        // (0018,106E) TriggerSamplePosition 3 UL [1]
-                                        val = Papy3GetElement(waveformSequenceGroup, papTriggerSamplePositionGr, &nbVal, &elemType);
-                                        if (val) ws.triggerSamplePosition = val->ul;
-                                        
-                                    } break;
-                                    case 0x003A: {
-                                        // (003A,0004) WaveformOriginality 1 CS [1]
-                                        val = Papy3GetElement(waveformSequenceGroup, papWaveformOriginalityGr, &nbVal, &elemType);
-                                        if (val && val->a && validAPointer(elemType)) [ws setWaveformOriginalityCS:val->a];
-                                        
-                                        // (003A,0005) NumberOfWaveformChannels 1 US [1]
-                                        val = Papy3GetElement(waveformSequenceGroup, papNumberOfWaveformChannelsGr, &nbVal, &elemType);
-                                        if (val) ws.numberOfWaveformChannels = val->us;
-                                        
-                                        // (003A,0010) NumberOfWaveformSamples 1 UL [1]
-                                        val = Papy3GetElement(waveformSequenceGroup, papNumberOfWaveformSamplesGr, &nbVal, &elemType);
-                                        if (val) ws.numberOfWaveformSamples = val->ul;
-                                        
-                                        // (003A,001A) SamplingFrequency 1 DS [1]
-                                        val = Papy3GetElement(waveformSequenceGroup, papSamplingFrequencyGr, &nbVal, &elemType);
-                                        if (val && val->a && validAPointer(elemType)) ws.samplingFrequency = strtod(val->a, NULL);
-                                        
-                                        // (003A,0020) MultiplexGroupLabel 3 SH [1]
-                                        val = Papy3GetElement(waveformSequenceGroup, papMultiplexGroupLabelGr, &nbVal, &elemType);
-                                        if (val && val->a && validAPointer(elemType)) ws.multiplexGroupLabel = [NSString stringWithCString:val->a encoding:NSISOLatin1StringEncoding];
-                                        
-                                        // (003A,0200) ChannelDefinitionSequence 1 SQ [1] (1+)
-                                        val = Papy3GetElement(waveformSequenceGroup, papChannelDefinitionSequenceGr, &nbVal, &elemType);
-                                        if (val && nbVal > 0 && val->sq)
-                                            for (Papy_List* lChannelDefinitionSequence = val->sq; lChannelDefinitionSequence; lChannelDefinitionSequence = lChannelDefinitionSequence->next) {
-                                                DCMWaveformChannelDefinition* cd = [ws newChannelDefinition];
-//                                                NSLog(@"... cd...");
-                                                for (Papy_List* lChannelDefinitionSequenceGroup = lChannelDefinitionSequence->object->item; lChannelDefinitionSequenceGroup; lChannelDefinitionSequenceGroup = lChannelDefinitionSequenceGroup->next) {
-                                                    SElement* channelDefinitionSequenceGroup = (SElement*)lChannelDefinitionSequenceGroup->object->group;
-//                                                    NSLog(@"   ... (%04X,%04X)", channelDefinitionSequenceGroup->group, channelDefinitionSequenceGroup->element);
-                                                    switch (channelDefinitionSequenceGroup->group) {
-                                                        case 0x003A: {
-                                                            // (003A,0202) WaveformChannelNumber 3 IS [1]
-                                                            val = Papy3GetElement(channelDefinitionSequenceGroup, papWaveformChannelNumberGr, &nbVal, &elemType);
-                                                            if (val && val->a && validAPointer(elemType)) cd.waveformChannelNumber = strtol(val->a, NULL, 10);
-                                                            
-                                                            // (003A,0203) ChannelLabel 3 SH [1]
-                                                            val = Papy3GetElement(channelDefinitionSequenceGroup, papChannelLabelGr, &nbVal, &elemType);
-                                                            if (val && val->a && validAPointer(elemType)) cd.channelLabel = [NSString stringWithCString:val->a encoding:NSISOLatin1StringEncoding];
-                                                            
-                                                            // (003A,0205) ChannelStatus 3 CS [1-n]
-                                                            val = Papy3GetElement(channelDefinitionSequenceGroup, papChannelStatusGr, &nbVal, &elemType);
-                                                            if (val && val->a && validAPointer(elemType)) [cd setChannelStatusCS:val->a];
-                                                            
-                                                            // (003A,0208) ChannelSourceSequence 1 SQ [1] (1)
-                                                            val = Papy3GetElement(channelDefinitionSequenceGroup, papChannelSourceSequenceGr, &nbVal, &elemType);
-                                                            if (val && nbVal > 0 && val->sq)
-                                                                for (Papy_List* lChannelSourceSequence = val->sq; lChannelSourceSequence; lChannelSourceSequence = lChannelSourceSequence->next) {
-                                                                    DCMWaveformChannelSource* cs = [cd newChannelSource];
-//                                                                    NSLog(@"...... cs...");
-                                                                    // [Code Sequence Macro]
-                                                                    [self papyLoadCodeSequenceMacro:cs from:lChannelSourceSequence->object];
-                                                                }
-                                                            
-                                                            // (003A,0209) ChannelSourceModifiersSequence 1C SQ [1] (1+)
-                                                            val = Papy3GetElement(channelDefinitionSequenceGroup, papChannelSourceModifiersSequenceGr, &nbVal, &elemType);
-                                                            if (val && nbVal > 0 && val->sq)
-                                                                for (Papy_List* lChannelSourceModifiersSequence = val->sq; lChannelSourceModifiersSequence; lChannelSourceModifiersSequence = lChannelSourceModifiersSequence->next) {
-                                                                    DCMWaveformChannelSourceModifier* csm = [cd newChannelSourceModifier];
-//                                                                    NSLog(@"...... csm...");
-                                                                    // [Code Sequence Macro]
-                                                                    [self papyLoadCodeSequenceMacro:csm from:lChannelSourceModifiersSequence->object];
-
-                                                                }
-                                                            
-                                                            // (003A,020A) SourceWaveformSequence 3 SQ [1] (1+)
-                                                            val = Papy3GetElement(channelDefinitionSequenceGroup, papSourceWaveformSequenceGr, &nbVal, &elemType);
-                                                            if (val && nbVal > 0 && val->sq)
-                                                                for (Papy_List* lSourceWaveformSequence = val->sq; lSourceWaveformSequence; lSourceWaveformSequence = lSourceWaveformSequence->next) {
-                                                                    DCMWaveformSourceWaveform* sw = [cd newSourceWaveform];
-//                                                                    NSLog(@"...... sw...");
-                                                                    for (Papy_List* lSourceWaveformSequenceGroup = lSourceWaveformSequence->object->item; lSourceWaveformSequenceGroup; lSourceWaveformSequenceGroup = lSourceWaveformSequenceGroup->next) {
-                                                                        SElement* sourceWaveformSequenceGroup = (SElement*)lSourceWaveformSequenceGroup->object->group;
-//                                                                        NSLog(@"      ... (%04X,%04X)", sourceWaveformSequenceGroup->group, sourceWaveformSequenceGroup->element);
-                                                                        switch (sourceWaveformSequenceGroup->group) {
-                                                                            case 0x0040: {
-                                                                                // (0040,A0B0) ReferencedWaveformChannels 1 US [2-2n]
-                                                                                val = Papy3GetElement(channelDefinitionSequenceGroup, papReferencedWaveformChannelsGr, &nbVal, &elemType);
-                                                                                if (val) sw.referencedWaveformChannels = val->us;
-                                                                            } break;
-                                                                        }
-                                                                    }
-                                                                    // [SOP Instance Reference Macro]
-                                                                    [self papyLoadSOPInstanceReferenceMacro:sw from:lSourceWaveformSequence->object];
-                                                                }
-                                                            
-                                                            // (003A,020C) ChannelDerivationDescription 3 LO [1]
-                                                            val = Papy3GetElement(channelDefinitionSequenceGroup, papChannelDerivationDescriptionGr, &nbVal, &elemType);
-                                                            if (val && val->a && validAPointer(elemType)) cd.channelDerivationDescription = [NSString stringWithCString:val->a encoding:NSISOLatin1StringEncoding];
-                                                            
-                                                            // (003A,0210) ChannelSensitivity 1C DS [1]
-                                                            val = Papy3GetElement(channelDefinitionSequenceGroup, papChannelSensitivityGr, &nbVal, &elemType);
-                                                            if (val && val->a && validAPointer(elemType)) cd.channelSensitivity = strtod(val->a, NULL);
-                                                            
-                                                            // (003A,0211) ChannelSensitivityUnitsSequence 1C SQ [1] (1)
-                                                            val = Papy3GetElement(channelDefinitionSequenceGroup, papChannelSensitivityUnitsSequenceGr, &nbVal, &elemType);
-                                                            if (val && nbVal > 0 && val->sq)
-                                                                for (Papy_List* lChannelSensitivityUnitsSequence = val->sq; lChannelSensitivityUnitsSequence; lChannelSensitivityUnitsSequence = lChannelSensitivityUnitsSequence->next) {
-                                                                    DCMWaveformChannelSensitivityUnit* csu = [cd newChannelSensitivityUnit];
-//                                                                    NSLog(@"...... csu...");
-                                                                    // [Code Sequence Macro]
-                                                                    [self papyLoadCodeSequenceMacro:csu from:lChannelSensitivityUnitsSequence->object];
-                                                                }
-                                                            
-                                                            // (003A,0212) ChannelSensitivityCorrectionFactor 1C DS [1]
-                                                            val = Papy3GetElement(channelDefinitionSequenceGroup, papChannelSensitivityCorrectionFactorGr, &nbVal, &elemType);
-                                                            if (val && val->a && validAPointer(elemType)) cd.channelSensitivityCorrectionFactor = strtod(val->a, NULL);
-                                                            
-                                                            // (003A,0213) ChannelBaseline 1C DS [1]
-                                                            val = Papy3GetElement(channelDefinitionSequenceGroup, papChannelBaselineGr, &nbVal, &elemType);
-                                                            if (val && val->a && validAPointer(elemType)) cd.channelBaseline = strtod(val->a, NULL);
-                                                            
-                                                            // (003A,0214) ChannelTimeSkew 1C DS [1]
-                                                            val = Papy3GetElement(channelDefinitionSequenceGroup, papChannelTimeSkewGr, &nbVal, &elemType);
-                                                            if (val && val->a && validAPointer(elemType)) cd.channelTimeSkew = strtod(val->a, NULL);
-                                                            
-                                                            // (003A,0215) ChannelSampleSkew 1C DS [1]
-                                                            val = Papy3GetElement(channelDefinitionSequenceGroup, papChannelSampleSkewGr, &nbVal, &elemType);
-                                                            if (val && val->a && validAPointer(elemType)) cd.channelSampleSkew = strtod(val->a, NULL);
-                                                            
-                                                            // (003A,0218) ChannelOffset 3 DS [1]
-                                                            val = Papy3GetElement(channelDefinitionSequenceGroup, papChannelOffsetGr, &nbVal, &elemType);
-                                                            if (val && val->a && validAPointer(elemType)) cd.channelOffset = strtod(val->a, NULL);
-                                                            
-                                                            // (003A,021A) WaveformBitsStored 1 US [1]
-                                                            val = Papy3GetElement(channelDefinitionSequenceGroup, papWaveformBitsStoredGr, &nbVal, &elemType);
-                                                            if (val) cd.waveformBitsStored = val->us;
-                                                            
-                                                            // (003A,0220) FilterLowFrequency 3 DS [1]
-                                                            val = Papy3GetElement(channelDefinitionSequenceGroup, papFilterLowFrequencyGr, &nbVal, &elemType);
-                                                            if (val && val->a && validAPointer(elemType)) cd.filterLowFrequency = strtod(val->a, NULL);
-
-                                                            // (003A,0221) FilterHighFrequency 3 DS [1]
-                                                            val = Papy3GetElement(channelDefinitionSequenceGroup, papFilterHighFrequencyGr, &nbVal, &elemType);
-                                                            if (val && val->a && validAPointer(elemType)) cd.filterHighFrequency = strtod(val->a, NULL);
-
-                                                            // (003A,0222) NotchFilterFrequency 3 DS [1]
-                                                            val = Papy3GetElement(channelDefinitionSequenceGroup, papNotchFilterFrequencyGr, &nbVal, &elemType);
-                                                            if (val && val->a && validAPointer(elemType)) cd.notchFilterFrequency = strtod(val->a, NULL);
-
-                                                            // (003A,0223) NotchFilterBandwidth 3 DS [1]
-                                                            val = Papy3GetElement(channelDefinitionSequenceGroup, papNotchFilterBandwidthGr, &nbVal, &elemType);
-                                                            if (val && val->a && validAPointer(elemType)) cd.notchFilterBandwidth = strtod(val->a, NULL);
-                                                            
-                                                        } break;
-                                                        case 0x5400: {
-                                                            // (5400,0110) ChannelMinimumValue 3 OB/OW [1]
-                                                            val = Papy3GetElement(channelDefinitionSequenceGroup, papChannelMinimumValueGr, &nbVal, &elemType);
-                                                            if (val) {
-                                                                if (val->a && validAPointer(elemType)) // OB
-                                                                    [cd setChannelMinimumValue:val->a length:nbVal];
-                                                                else // OW
-                                                                    [cd setChannelMinimumValue:val->ow length:nbVal*2];
-                                                            }
-
-                                                            // (5400,0112) ChannelMaximumValue 3 OB/OW [1]
-                                                            val = Papy3GetElement(channelDefinitionSequenceGroup, papChannelMaximumValueGr, &nbVal, &elemType);
-                                                            if (val) {
-                                                                if (val->a && validAPointer(elemType)) // OB
-                                                                    [cd setChannelMaximumValue:val->a length:nbVal];
-                                                                else // OW
-                                                                    [cd setChannelMaximumValue:val->ow length:nbVal*2];
-                                                            }
-
-                                                        }  break;
-                                                    }
-                                                }
-                                            }
-                                        
-                                    } break;
-                                    case 0x5400: {
-                                        // (5400,1004) WaveformBitsAllocated 1 US [1]
-                                        val = Papy3GetElement(waveformSequenceGroup, papWaveformBitsAllocatedGr, &nbVal, &elemType);
-                                        if (val) ws.waveformBitsAllocated = val->us;
-                                        
-                                        // (5400,1006) WaveformSampleInterpretation 1 CS [1]
-                                        val = Papy3GetElement(waveformSequenceGroup, papWaveformSampleInterpretationGr, &nbVal, &elemType);
-                                        if (val && val->a && validAPointer(elemType)) [ws setWaveformSampleInterpretationCS:val->a];
-                                        
-                                        // (5400,100A) WaveformPaddingValue 1C OB/OW [1]
-                                        val = Papy3GetElement(waveformSequenceGroup, papWaveformPaddingValueGr, &nbVal, &elemType);
-                                        if (val) {
-                                            if (val->a && validAPointer(elemType)) // OB
-                                                [ws setWaveformPaddingValue:val->a length:nbVal];
-                                            else // OW
-                                                [ws setWaveformPaddingValue:val->ow length:nbVal*2];
-                                        }
-                                        
-                                        // (5400,1010) WaveformData 1 OB/OW [1]
-                                        val = Papy3GetElement(waveformSequenceGroup, papWaveformDataGr, &nbVal, &elemType);
-                                        if (val) {
-                                            if (val->a && validAPointer(elemType)) // OB
-                                                [ws setWaveformData:val->a length:ws.numberOfWaveformChannels*ws.numberOfWaveformSamples*ws.waveformBitsAllocated/8];
-                                            else // OW
-                                                [ws setWaveformData:val->ow length:ws.numberOfWaveformChannels*ws.numberOfWaveformSamples*2];
-                                        }
-                                        
-                                    } break;
-                                }
-                                
-                            }
-                        }
-                    }
-
-                    
-                }*/
-                
-		#pragma mark tag group 6000		
-				
-				theGroupP = (SElement*) [self getPapyGroup: 0x6000];
-				if( theGroupP)
-				{
-					val = Papy3GetElement (theGroupP, papOverlayRows6000Gr, &nbVal, &elemType);
-					if ( val) oRows	= val->us;
-					
-					val = Papy3GetElement (theGroupP, papOverlayColumns6000Gr, &nbVal, &elemType);
-					if ( val) oColumns	= val->us;
-					
-					//			val = Papy3GetElement (theGroupP, papNumberofFramesinOverlayGr, &nbVal, &elemType);
-					//			if ( val) oRows	= val->us;
-					
-					val = Papy3GetElement (theGroupP, papOverlayTypeGr, &nbVal, &elemType);
-					if ( val && val->a && validAPointer( elemType)) oType = val->a[ 0];
-					
-					val = Papy3GetElement (theGroupP, papOriginGr, &nbVal, &elemType);
-					if( val && nbVal == 2)
-					{
-						oOrigin[ 0]	= val++->us;
-						oOrigin[ 1]	= val++->us;
-					}
-					
-					val = Papy3GetElement (theGroupP, papOverlayBitsAllocatedGr, &nbVal, &elemType);
-					if ( val) oBits	= val->us;
-					
-					val = Papy3GetElement (theGroupP, papBitPositionGr, &nbVal, &elemType);
-					if ( val) oBitPosition	= val->us;
-					
-					val = Papy3GetElement (theGroupP, papOverlayDataGr, &nbVal, &elemType);
-					if (val != NULL && oBits == 1 && oBitPosition == 0)
-					{
-						if( oData) free( oData);
-						oData = calloc( oRows*oColumns, 1);
-						if( oData)
-						{
-							register unsigned short *pixels = val->ow;
-							register unsigned char *oD = oData;
-							register char mask = 1;
-							register long t = oColumns*oRows/16;
-							
-							while( t-->0)
-							{
-								register unsigned short	octet = *pixels++;
-								register int x = 16;
-								while( x-->0)
-								{
-									char v = octet & mask ? 1 : 0;
-									octet = octet >> 1;
-									
-									if( v)
-										*oD = 0xFF;
-									
-									oD++;
-								}
-							}
-						}
-					}
-				}
-				
-		#pragma mark PhilipsFactor		
-				theGroupP = (SElement*) [self getPapyGroup: 0x7053];
-				if( theGroupP)
-				{
-					val = Papy3GetElement (theGroupP, papSUVFactor7053Gr, &nbVal, &elemType);
-					
-					if( nbVal > 0)
-					{
-						if( val && val->a && validAPointer( elemType))
-							philipsFactor = atof( val->a);
-					}
-				}
-				
-		#pragma mark compute normal vector
-				
-				orientation[6] = orientation[1]*orientation[5] - orientation[2]*orientation[4];
-				orientation[7] = orientation[2]*orientation[3] - orientation[0]*orientation[5];
-				orientation[8] = orientation[0]*orientation[4] - orientation[1]*orientation[3];
-				
-				[self computeSliceLocation];
-				
-		#pragma mark read pixel data
-				
-				BOOL toBeUnlocked = YES;
-				[PapyrusLock lock];
-				
-				int fileNb = -1;
-				NSDictionary *dict = [cachedPapyGroups valueForKey: srcFile];
-				
-				if( [dict valueForKey: @"fileNb"] == nil)
-					[self getPapyGroup: 0];
-				
-				if( dict != nil && [dict valueForKey: @"fileNb"] == nil)
-					NSLog( @"******** dict != nil && [dict valueForKey: @fileNb] == nil");
-				
-				fileNb = [[dict valueForKey: @"fileNb"] intValue];
-				
-				if( fileNb >= 0)
-				{
-					short *oImage = nil;
-					
-					if( SOPClassUID != nil && [SOPClassUID hasPrefix: [DCMAbstractSyntaxUID pdfStorageClassUID]]) // EncapsulatedPDFStorage
-					{
-                        if( pdfData)
-                        {
-                            NSPDFImageRep *rep = [NSPDFImageRep imageRepWithData: pdfData];
-                            
-                            [rep setCurrentPage: frameNo];	
-                            
-                            NSImage *pdfImage = [[[NSImage alloc] init] autorelease];
-                            [pdfImage addRepresentation: rep];
-                            
-                            [self getDataFromNSImage: pdfImage];
-                            
-                            returnValue = YES;
-                        }
-					}
-                    else if( SOPClassUID != nil && [SOPClassUID hasPrefix: [DCMAbstractSyntaxUID EncapsulatedCDAStorage]]) // EncapsulatedPDFStorage
-					{
-                        returnValue = YES;
-                    }
-					else if( SOPClassUID != nil && [SOPClassUID hasPrefix: @"1.2.840.10008.5.1.4.1.1.88"]) // DICOM SR
-					{
-#ifdef OSIRIX_VIEWER
-#ifndef OSIRIX_LIGHT
-
-						@try
-						{
-                            [[NSFileManager defaultManager] confirmDirectoryAtPath:@"/tmp/dicomsr_osirix/"];
-							
-							NSString *htmlpath = [[@"/tmp/dicomsr_osirix/" stringByAppendingPathComponent: [srcFile lastPathComponent]] stringByAppendingPathExtension: @"xml"];
-							
-							if( [[NSFileManager defaultManager] fileExistsAtPath: htmlpath] == NO)
-							{
-								NSTask *aTask = [[[NSTask alloc] init] autorelease];		
-								[aTask setEnvironment:[NSDictionary dictionaryWithObject:[[[NSBundle mainBundle] resourcePath] stringByAppendingPathComponent:@"/dicom.dic"] forKey:@"DCMDICTPATH"]];
-								[aTask setLaunchPath: [[[NSBundle mainBundle] resourcePath] stringByAppendingPathComponent: @"/dsr2html"]];
-								[aTask setArguments: [NSArray arrayWithObjects: @"+X1", @"--unknown-relationship", @"--ignore-constraints", @"--ignore-item-errors", @"--skip-invalid-items", srcFile, htmlpath, nil]];		
-								[aTask launch];
-                                
-                                while( [aTask isRunning])
-                                    [NSThread sleepForTimeInterval: 0.1];
-                                
-								//[aTask waitUntilExit];		// <- This is VERY DANGEROUS : the main runloop is continuing...
-								[aTask interrupt];
-							}
-							
-							if( [[NSFileManager defaultManager] fileExistsAtPath: [htmlpath stringByAppendingPathExtension: @"pdf"]] == NO)
-							{
-                                if( [[NSFileManager defaultManager] fileExistsAtPath: [[[NSBundle mainBundle] resourcePath] stringByAppendingPathComponent:@"/Decompress"]])
-                                {
-                                    NSTask *aTask = [[[NSTask alloc] init] autorelease];
-                                    [aTask setLaunchPath: [[[NSBundle mainBundle] resourcePath] stringByAppendingPathComponent:@"/Decompress"]];
-                                    [aTask setArguments: [NSArray arrayWithObjects: htmlpath, @"pdfFromURL", nil]];		
-                                    [aTask launch];
-                                    
-                                    NSTimeInterval start = [NSDate timeIntervalSinceReferenceDate];
-                                    while( [aTask isRunning] && [NSDate timeIntervalSinceReferenceDate] - start < 10)
-                                        [NSThread sleepForTimeInterval: 0.1];
-    //								[aTask waitUntilExit];      // <- This is VERY DANGEROUS : the main runloop is continuing...
-                                    
-                                    [aTask interrupt];
-                                }
-							}
-							
-							NSPDFImageRep *rep = [NSPDFImageRep imageRepWithData: [NSData dataWithContentsOfFile: [htmlpath stringByAppendingPathExtension: @"pdf"]]];
-																	
-							[rep setCurrentPage: frameNo];	
-							
-							NSImage *pdfImage = [[[NSImage alloc] init] autorelease];
-							[pdfImage addRepresentation: rep];
-							
-							[self getDataFromNSImage: pdfImage];
-							
-							returnValue = YES;
-						}
-						@catch (NSException * e)
-						{
-                            N2LogExceptionWithStackTrace(e);
-						}
-	#else
-		[self getDataFromNSImage: [NSImage imageNamed: @"NSIconViewTemplate"]];
-		returnValue = YES;
-	#endif
-	#else
-		[self getDataFromNSImage: [NSImage imageNamed: @"NSIconViewTemplate"]];
-		returnValue = YES;
-	#endif
-
-					}
-					else if( SOPClassUID != nil && [DCMAbstractSyntaxUID isNonImageStorage: SOPClassUID]) // non-image
-					{
-						if( fExternalOwnedImage)
-							fImage = fExternalOwnedImage;
-						else
-							fImage = malloc( 128 * 128 * 4);
-						
-						height = 128;
-						width = 128;
-						oImage = nil;
-						isRGB = NO;
-						
-						for( int i = 0; i < 128*128; i++)
-							fImage[ i ] = i%2;
-                        
-                        returnValue = YES;
-					}
-					else
-					{
-						// position the file pointer to the begining of the data set 
-						err = Papy3GotoNumber (fileNb, (PapyShort) imageNb, DataSetID);
-						
-						// then goto group 0x7FE0 
-						if ((err = Papy3GotoGroupNb0x7FE0 (fileNb, &theGroupP)) > 0) 
-						{
-								if( bitsStored == 8 && bitsAllocated == 16 && gArrPhotoInterpret[ fileNb] == RGB)
-									bitsAllocated = 8;
-								
-//                                signal(SIGFPE , signal_EXC_ARITHMETIC);
-//                                
-//                                if( sigsetjmp( mark, 1) != 0)
-//                                {
-//                                    oImage = 0L;
-//                                    
-//                                    NSLog( @"%@", [NSThread callStackSymbols]);
-//                                    NSLog( @"***** file: %@", srcFile);
-//                                }
-//                                else
-                                {
-//                                    int xx = 1;
-//                                    static int yy = 0;
-//                                    
-//                                    if( yy == 0)
-//                                        yy = 1;
-//                                    else
-//                                        yy = 0;
-//                                    xx = xx / yy; // Test the divide by zero exception
-                                    
-                                    oImage = (short*) Papy3GetPixelData (fileNb, imageNb, theGroupP, gUseJPEGColorSpace, &fPlanarConf);
-                                }
-                                
-//                                signal( SIGFPE, SIG_DFL);    /* Restore default action */
-                            
-//                                int xx = 1;
-//                                int yy = 0;
-//                                    
-//                                xx = xx / yy; // Test the divide by zero exception
-                            
-								[PapyrusLock unlock];
-								toBeUnlocked = NO;
-								
-								if( oImage == nil)
-								{
-									NSLog(@"This is really bad..... Please send this file to pixmeo@pixmeo.com");
-									goImageSize[ fileNb] = height * width * 8; // *8 in case of a 16-bit RGB encoding....
-									oImage = malloc( goImageSize[ fileNb]);
-									if( oImage)
-									{
-										int yo = 0;
-										for( i = 0 ; i < height * width * 4; i++)
-										{
-											oImage[ i] = yo++;
-											if( yo>= width) yo = 0;
-										}
-									}
-								}
-								
-								if( gArrPhotoInterpret [fileNb] == MONOCHROME1) // INVERSE IMAGE!
-								{
-									if( [self.modalityString isEqualToString:@"PT"] == YES || ([[NSUserDefaults standardUserDefaults] boolForKey:@"OpacityTableNM"] == YES && [self.modalityString isEqualToString:@"NM"] == YES))
-									{
-										inverseVal = NO;
-									}
-									else
-									{
-										inverseVal = YES;
-										savedWL = -savedWL;
-									}
-								}
-								else inverseVal = NO;
-								
-								isRGB = NO;
-								
-								if (gArrPhotoInterpret [fileNb] == YBR_FULL ||
-									gArrPhotoInterpret [fileNb] == YBR_FULL_422 ||
-									gArrPhotoInterpret [fileNb] == YBR_PARTIAL_422)
-								{
-		//							NSLog(@"YBR WORLD");
-									
-									char *rgbPixel = (char*) [self ConvertYbrToRgb:(unsigned char *) oImage :width :height :gArrPhotoInterpret [fileNb] :(char) fPlanarConf];
-									fPlanarConf = 0;	//ConvertYbrToRgb -> planar is converted
-									
-									efree3 ((void **) &oImage);
-									oImage = (short*) rgbPixel;
-									goImageSize[ fileNb] = width * height * 3;
-								}
-								
-								// This image has a palette -> Convert it to a RGB image !
-								if( fSetClut)
-								{
-									if( clutRed != nil && clutGreen != nil && clutBlue != nil)
-									{
-										unsigned char   *bufPtr = (unsigned char*) oImage;
-										unsigned short	*bufPtr16 = (unsigned short*) oImage;
-										unsigned char   *tmpImage;
-										int				totSize, pixelR, pixelG, pixelB, x, y;
-										
-										totSize = (int) ((int) height * (int) width * 3L);
-										tmpImage = malloc( totSize);
-										
-										fPlanarConf = NO;
-										
-										//	if( bitsAllocated != 8) NSLog(@"Palette with a non-8 bit image???");
-										
-										switch( bitsAllocated)
-										{
-											case 8:
-												for( y = 0; y < height; y++)
-												{
-													for( x = 0; x < width; x++)
-													{
-														pixelR = pixelG = pixelB = bufPtr[y*width + x];
-														
-														if( pixelR > clutEntryR) {	pixelR = clutEntryR-1;}
-														if( pixelG > clutEntryG) {	pixelG = clutEntryG-1;}
-														if( pixelB > clutEntryB) {	pixelB = clutEntryB-1;}
-														
-														tmpImage[y*width*3 + x*3 + 0] = clutRed[ pixelR];
-														tmpImage[y*width*3 + x*3 + 1] = clutGreen[ pixelG];
-														tmpImage[y*width*3 + x*3 + 2] = clutBlue[ pixelB];
-													}
-												}
-												break;
-												
-												case 16:
-					#if __BIG_ENDIAN__
-												InverseShorts( (vector unsigned short*) oImage, height * width);
-					#endif
-												
-												for( y = 0; y < height; y++)
-												{
-													for( x = 0; x < width; x++)
-													{
-														pixelR = pixelG = pixelB = bufPtr16[y*width + x];
-														
-														//	if( pixelR > clutEntryR) {	pixelR = clutEntryR-1;}
-														//	if( pixelG > clutEntryG) {	pixelG = clutEntryG-1;}
-														//	if( pixelB > clutEntryB) {	pixelB = clutEntryB-1;}
-														
-														tmpImage[y*width*3 + x*3 + 0] = clutRed[ pixelR];
-														tmpImage[y*width*3 + x*3 + 1] = clutGreen[ pixelG];
-														tmpImage[y*width*3 + x*3 + 2] = clutBlue[ pixelB];
-													}
-												}
-												bitsAllocated = 8;
-												break;
-										}
-										
-										isRGB = YES;
-										
-										efree3 ((void **) &oImage);
-										oImage = (short*) tmpImage;
-										goImageSize[ fileNb] = width * height * 3;
-									}
-								}
-								
-								if( fSetClut16)
-								{
-									unsigned short	*bufPtr = (unsigned short*) oImage;
-									unsigned char   *tmpImage;
-									int				totSize, x, y, ii;
-									unsigned short pixel;
-									
-									fPlanarConf = NO;
-									
-									totSize = (int) ((int) height * (int) width * 3L);
-									tmpImage = malloc( totSize);
-									
-									if( bitsAllocated != 16) NSLog(@"Segmented Palette with a non-16 bit image???");
-									
-									ii = height * width;
-									
-				#if __ppc__ || __ppc64__
-									if( Altivec)
-									{
-										InverseShorts( (vector unsigned short*) oImage, ii);
-									}
-									else
-				#endif
-										
-				#if __BIG_ENDIAN__
-									{
-										PapyUShort	 *theUShortP = (PapyUShort *) oImage;
-										PapyUShort val;
-										
-										while( ii-- > 0)
-										{
-											val = *theUShortP;
-											*theUShortP++ = (val >> 8) | (val << 8);   // & 0x00FF  --  & 0xFF00
-										}
-									}
-				#endif
-									
-									if( shortRed && shortGreen && shortBlue)
-									{
-										for( y = 0; y < height; y++)
-										{
-											for( x = 0; x < width; x++)
-											{
-												pixel = bufPtr[y*width + x];
-												tmpImage[y*width*3 + x*3 + 0] = shortRed[ pixel];
-												tmpImage[y*width*3 + x*3 + 1] = shortGreen[ pixel];
-												tmpImage[y*width*3 + x*3 + 2] = shortBlue[ pixel];
-											}
-										}
-									}
-									
-									isRGB = YES;
-									bitsAllocated = 8;
-									
-									efree3 ((void **) &oImage);
-									oImage = (short*) tmpImage;
-									goImageSize[ fileNb] = width * height * 3;
-									
-									if( shortRed) free( shortRed);
-									if( shortGreen) free( shortGreen);
-									if( shortBlue) free( shortBlue);
-									
-									shortRed = nil;
-									shortGreen = nil;
-									shortBlue = nil;
-								}
-								
-								// we need to know how the pixels are stored
-								if (isRGB == YES ||
-									gArrPhotoInterpret [fileNb] == RGB ||
-									gArrPhotoInterpret [fileNb] == YBR_FULL ||
-									gArrPhotoInterpret [fileNb] == YBR_FULL_422 ||
-									gArrPhotoInterpret [fileNb] == YBR_PARTIAL_422 ||
-									gArrPhotoInterpret [fileNb] == YBR_ICT ||
-									gArrPhotoInterpret [fileNb] == YBR_RCT)
-								{
-									unsigned char   *ptr, *tmpImage;
-									int				loop, totSize;
-									
-									isRGB = YES;
-									
-									// CONVERT RGB TO ARGB FOR BETTER PERFORMANCE THRU VIMAGE
-									{
-										totSize = (int) ((int) height * (int) width * 4L);
-										tmpImage = malloc( totSize);
-										if( tmpImage)
-										{
-											ptr    = tmpImage;
-											
-											if( bitsAllocated > 8) // RGB - 16 bits
-											{
-												unsigned short   *bufPtr;
-												bufPtr = (unsigned short*) oImage;
-												
-												#if __BIG_ENDIAN__
-												InverseShorts( (vector unsigned short*) oImage, height * width * 3);
-												#endif
-												
-												if( fPlanarConf > 0)	// PLANAR MODE
-												{
-													int imsize = (int) height * (int) width;
-													int x = 0;
-													
-													loop = totSize/4;
-													while( loop-- > 0)
-													{
-														*ptr++	= 255;			//ptr++;
-														*ptr++	= bufPtr[ 0 * imsize + x];		//ptr++;  bufPtr++;
-														*ptr++	= bufPtr[ 1 * imsize + x];		//ptr++;  bufPtr++;
-														*ptr++	= bufPtr[ 2 * imsize + x];		//ptr++;  bufPtr++;
-														
-														x++;
-													}
-												}
-												else
-												{
-													loop = totSize/4;
-													while( loop-- > 0)
-													{
-														*ptr++	= 255;			//ptr++;
-														*ptr++	= *bufPtr++;		//ptr++;  bufPtr++;
-														*ptr++	= *bufPtr++;		//ptr++;  bufPtr++;
-														*ptr++	= *bufPtr++;		//ptr++;  bufPtr++;
-													}
-												}
-											}
-											else
-											{
-												unsigned char   *bufPtr;
-												bufPtr = (unsigned char*) oImage;
-												
-												if( fPlanarConf > 0)	// PLANAR MODE
-												{
-													int imsize = (int) height * (int) width;
-													int x = 0;
-													
-													loop = totSize/4;
-													while( loop-- > 0)
-													{
-														*ptr++	= 255;			//ptr++;
-														*ptr++	= bufPtr[ 0 * imsize + x];		//ptr++;  bufPtr++;
-														*ptr++	= bufPtr[ 1 * imsize + x];		//ptr++;  bufPtr++;
-														*ptr++	= bufPtr[ 2 * imsize + x];		//ptr++;  bufPtr++;
-														
-														x++;
-													}
-												}
-												else
-												{
-													loop = totSize/4;
-													while( loop-- > 0)
-													{
-														*ptr++	= 255;
-														*ptr++	= *bufPtr++;
-														*ptr++	= *bufPtr++;
-														*ptr++	= *bufPtr++;
-													}
-												}
-											}
-											efree3 ((void **) &oImage);
-											oImage = (short*) tmpImage;
-											goImageSize[ fileNb] = width * height * 4;
-										}
-									}
-								}
-								else
-                                {
-                                    if( fIsSigned && bitsAllocated != bitsStored) //We have to move the signing bit
-                                    {
-                                        if( bitsAllocated == 16)
-                                        {
-                                            short *bufPtr = (short*) oImage, *tmpImage;
-                                            long loop, totSize;
-                                            const int shift = bitsAllocated - bitsStored;
-                                            
-                                            tmpImage = malloc( height * width * 2L);
-                                            short *ptr = tmpImage;
-                                            
-                                            loop = height * width;
-                                            short div = pow( 2, shift);
-                                            while( loop-- > 0)
-                                                *ptr++ = ((short)(*(bufPtr++) << shift))/div;
-                                            
-                                            free(oImage);
-                                            oImage =  (short*) tmpImage;
-                                        }
-                                    }
-                                    
-                                    if( bitsAllocated == 8)	// Black & White 8 bit image -> 16 bits image
-                                    {
-                                        unsigned char   *bufPtr;
-                                        short			*ptr, *tmpImage;
-                                        int				loop, totSize;
-                                        
-                                        totSize = (int) ((int) height * (int) width * 2L);
-                                        tmpImage = malloc( totSize);
-                                        
-                                        bufPtr = (unsigned char*) oImage;
-                                        ptr    = tmpImage;
-                                        
-                                        loop = totSize/2;
-                                        while( loop-- > 0)
-                                        {
-                                            *ptr++ = *bufPtr++;
-                                        }
-                                        
-                                        efree3 ((void **) &oImage);
-                                        oImage =  (short*) tmpImage;
-                                        goImageSize[ fileNb] = height * (int) width * 2L;
-                                    }
-								}
-                            
-								//if( fIsSigned == YES && 
-								
-								[PapyrusLock lock];
-								// free group 7FE0 
-								err = Papy3GroupFree (&theGroupP, TRUE);
-								[PapyrusLock unlock];
-						}
-                        else NSLog( @"Papy3GotoGroupNb0x7FE0 failed: frame %d", imageNb);
-					
-						#pragma mark RGB or fPlanar
-					
-						//***********
-						if( isRGB)
-						{
-							if( fExternalOwnedImage)
-							{
-								fImage = fExternalOwnedImage;
-								if( oImage)
-								{
-									memcpy( fImage, oImage, width*height*sizeof(float));
-									free(oImage);
-								}
-							}
-							else fImage = (float*) oImage;
-							
-							oImage = nil;
-							
-							if( oData && gDisplayDICOMOverlays)
-							{
-                                unsigned char	*rgbData = (unsigned char*) fImage;
-                                
-                                for( int y = 0; y < oRows; y++)
-                                {
-                                    for( int x = 0; x < oColumns; x++)
-                                    {
-                                        if( oData[ y * oColumns + x])
-                                        {
-                                            if( (x + oOrigin[ 0]) >= 0 && (x + oOrigin[ 0]) < width &&
-                                                (y + oOrigin[ 1]) >= 0 && (y + oOrigin[ 1]) < height)
-                                            {
-                                                rgbData[ (y + oOrigin[ 1]) * width*4 + (x + oOrigin[ 0])*4 + 1] = 0xFF;
-                                                rgbData[ (y + oOrigin[ 1]) * width*4 + (x + oOrigin[ 0])*4 + 2] = 0xFF;
-                                                rgbData[ (y + oOrigin[ 1]) * width*4 + (x + oOrigin[ 0])*4 + 3] = 0xFF;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-						}
-						else
-						{
-							if( bitsAllocated == 32)  // 32-bit float or 32-bit integers
-							{
-								if( fExternalOwnedImage)
-									fImage = fExternalOwnedImage;
-								else
-									fImage = malloc(width*height*sizeof(float) + 100);
-								
-								if( fImage)
-								{
-									memcpy( fImage, oImage, height * width * sizeof( float));
-									
-									if( slope != 1.0 || offset != 0 || [[NSUserDefaults standardUserDefaults] boolForKey: @"32bitDICOMAreAlwaysIntegers"])
-									{
-										unsigned int *usint = (unsigned int*) oImage;
-										int *sint = (int*) oImage;
-										float *tDestF = fImage;
-										double dOffset = offset, dSlope = slope;
-										
-										if( fIsSigned > 0)
-										{
-											unsigned long x = height * width;
-											while( x-- > 0)
-												*tDestF++ = (((double) (*sint++)) + dOffset) * dSlope;
-										}
-										else
-										{
-											unsigned long x = height * width;
-											while( x-- > 0)
-												*tDestF++ = (((double) (*usint++)) + dOffset) * dSlope;
-										}
-									}
-								}
-								else
-									N2LogStackTrace( @"*** Not enough memory - malloc failed");
-									
-								free(oImage);
-								oImage = nil;
-							}
-							else
-							{
-								if( oImage)
-								{
-									vImage_Buffer src16, dstf;
-									
-									dstf.height = src16.height = height;
-									dstf.width = src16.width = width;
-									src16.rowBytes = width*2;
-									dstf.rowBytes = width*sizeof(float);
-									
-									src16.data = oImage;
-									
-									if( VOILUT_number != 0 && VOILUT_depth != 0 && VOILUT_table != nil)
-									{
-                                        if( gUseVOILUT)
-                                            [self setVOILUT:VOILUT_first number:VOILUT_number depth:VOILUT_depth table:VOILUT_table image:(unsigned short*) oImage isSigned: fIsSigned];
-									}
-									
-									if( fExternalOwnedImage)
-										fImage = fExternalOwnedImage;
-									else
-										fImage = malloc(width*height*sizeof(float) + 100);
-									
-									dstf.data = fImage;
-									
-									if( dstf.data)
-									{
-										if( fIsSigned)
-											vImageConvert_16SToF( &src16, &dstf, offset, slope, 0);
-										else
-											vImageConvert_16UToF( &src16, &dstf, offset, slope, 0);
-										
-										if( inverseVal)
-										{
-											float neg = -1;
-											vDSP_vsmul( fImage, 1, &neg, fImage, 1, height * width);
-										}
-									}
-									else N2LogStackTrace( @"*** Not enough memory - malloc failed");
-									
-									free(oImage);
-								}
-								oImage = nil;
-							}
-							
-							if( oData && gDisplayDICOMOverlays && fImage)
-                            {
-                                float maxValue = 0;
-                                
-                                if( inverseVal)
-                                    maxValue = -offset;
-                                else
-                                {
-                                    maxValue = pow( 2, bitsStored);
-                                    maxValue *= slope;
-                                    maxValue += offset;
-                                }
-                                
-                                for( int y = 0; y < oRows; y++)
-                                {
-                                    for( int x = 0; x < oColumns; x++)
-                                    {
-                                        if( oData[ y * oColumns + x])
-                                        {
-                                            if( (x + oOrigin[ 0]) >= 0 && (x + oOrigin[ 0]) < width &&
-                                               (y + oOrigin[ 1]) >= 0 && (y + oOrigin[ 1]) < height)
-                                            {
-                                                fImage[ (y + oOrigin[ 1]) * width + x + oOrigin[ 0]] = maxValue;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-						}
-					}
-					//***********
-					
-					//	endTime = MyGetTime();
-					//	NSLog([ NSString stringWithFormat: @"%d", ((long) (endTime - startTime))/1000 ]);
-					
-					wl = 0;
-					ww = 0; //Computed later, only if needed
-					
-					if( isRGB)
-					{
-						savedWL = 0;
-						savedWW = 0;
-					}
-					
-					if( savedWW != 0)
-					{
-						wl = savedWL;
-						ww = savedWW;
-					}
-					
-					if( clutRed) free( clutRed);
-					if( clutGreen) free( clutGreen);
-					if( clutBlue) free( clutBlue);
-				}
-				
-				if( toBeUnlocked)
-					[PapyrusLock unlock];
-				
-				#ifdef OSIRIX_VIEWER
-				[self loadCustomImageAnnotationsPapyLink: fileNb];
-				#endif
-				
-				if( pixelSpacingY != 0)
-				{
-					if( fabs(pixelSpacingX) / fabs(pixelSpacingY) > 10000 || fabs(pixelSpacingX) / fabs(pixelSpacingY) < 0.0001)
-					{
-						pixelSpacingX = 1;
-						pixelSpacingY = 1;
-					}
-				}
-				
-				if( pixelSpacingX < 0) pixelSpacingX = -pixelSpacingX;
-				if( pixelSpacingY < 0) pixelSpacingY = -pixelSpacingY;
-				if( pixelSpacingY != 0 && pixelSpacingX != 0)
-                {
-                    if( estimatedRadiographicMagnificationFactor)
-                    {
-                        pixelSpacingX /= estimatedRadiographicMagnificationFactor;
-                        pixelSpacingY /= estimatedRadiographicMagnificationFactor;
-                    }
-                    
-                    pixelRatio = pixelSpacingY / pixelSpacingX;
-				}
-                
-				if( err >= 0)
-					returnValue = YES;
-			}
-			else NSLog( @"[self getPapyGroup: 0x0028] failed");
-		}
-		else NSLog( @"[self getPapyGroup: 0] failed");
-	}
-	@catch (NSException *e)
-	{
-		NSLog( @"***load DICOM Papyrus exeption: %@", e);
-		returnValue = NO;
-	}
-	
-	[purgeCacheLock lock];
-	[purgeCacheLock unlockWithCondition: [purgeCacheLock condition]-1];
-	
-	return returnValue;
+    return NO;
 }
 
 - (BOOL) isDICOMFile:(NSString *) file
@@ -9727,7 +6801,7 @@ void erase_outside_circle(char *buf, int width, int height, int cx, int cy, int 
 #ifdef OSIRIX_VIEWER
 	if( imageObjectID)
 	{
-        if( fileTypeHasPrefixDICOM == NO) readable = NO;
+	if( fileTypeHasPrefixDICOM == NO) readable = NO;
 	}
 	else
 #endif
@@ -9742,89 +6816,89 @@ void erase_outside_circle(char *buf, int width, int height, int cx, int cy, int 
 {
 	@autoreleasepool
     {
-        @try
+	@try
         {
-            CGImageRef cgRef = [otherImage CGImageForProposedRect:NULL context:nil hints:nil];
-            NSBitmapImageRep *r = [[[NSBitmapImageRep alloc] initWithCGImage:cgRef] autorelease];
-            [r setSize: otherImage.size];
+	    CGImageRef cgRef = [otherImage CGImageForProposedRect:NULL context:nil hints:nil];
+	    NSBitmapImageRep *r = [[[NSBitmapImageRep alloc] initWithCGImage:cgRef] autorelease];
+	    [r setSize: otherImage.size];
             
-            NSBitmapImageRep *TIFFRep = [NSBitmapImageRep imageRepWithData: [r TIFFRepresentation]];
-            
-            if( TIFFRep)
+	    NSBitmapImageRep *TIFFRep = [NSBitmapImageRep imageRepWithData: [r TIFFRepresentation]];
+
+	    if( TIFFRep)
             {
-                height = TIFFRep.pixelsHigh;
-                width = TIFFRep.pixelsWide;
-                
+		height = TIFFRep.pixelsHigh;
+		width = TIFFRep.pixelsWide;
+
     #ifdef OSIRIX_VIEWER
-                NSManagedObjectContext *iContext = nil;
-                
-                if( savedHeightInDB != 0 && savedHeightInDB != height)
-                {
-                    if( savedHeightInDB != OsirixDicomImageSizeUnknown)
-                        NSLog( @"******* [[imageObj valueForKey:@'height'] intValue] != height. New: %d / DB: %d", (int)height, (int)savedHeightInDB);
-                    
-                    if( iContext == nil)
-                        iContext = ([[NSThread currentThread] isMainThread] ? [[[BrowserController currentBrowser] database] managedObjectContext] : [[[BrowserController currentBrowser] database] independentContext]);
-                    
-                    [[iContext existingObjectWithID: imageObjectID error: nil] setValue: [NSNumber numberWithInt: height] forKey: @"height"];
-                }
-                
-                if( height > savedHeightInDB && fExternalOwnedImage)
-                    height = savedHeightInDB;
-                
-                if( savedWidthInDB != 0 && savedWidthInDB != width)
-                {
-                    if( savedWidthInDB != OsirixDicomImageSizeUnknown)
-                        NSLog( @"******* [[imageObj valueForKey:@'width'] intValue] != width. New: %d / DB: %d", (int)width, (int)savedWidthInDB);
-                    
-                    if( iContext == nil)
-                        iContext = ([[NSThread currentThread] isMainThread] ? [[[BrowserController currentBrowser] database] managedObjectContext] : [[[BrowserController currentBrowser] database] independentContext]);
-                    
-                    [[iContext existingObjectWithID: imageObjectID error: nil] setValue: [NSNumber numberWithInt: width] forKey: @"width"];
-                }
-                
-                if( width > savedWidthInDB && fExternalOwnedImage)
-                    width = savedWidthInDB;
-                
-                [iContext save: nil];
+		NSManagedObjectContext *iContext = nil;
+
+		if( savedHeightInDB != 0 && savedHeightInDB != height)
+		{
+		    if( savedHeightInDB != OsirixDicomImageSizeUnknown)
+			NSLog( @"******* [[imageObj valueForKey:@'height'] intValue] != height. New: %d / DB: %d", (int)height, (int)savedHeightInDB);
+
+		    if( iContext == nil)
+			iContext = ([[NSThread currentThread] isMainThread] ? [[[BrowserController currentBrowser] database] managedObjectContext] : [[[BrowserController currentBrowser] database] independentContext]);
+
+		    [[iContext existingObjectWithID: imageObjectID error: nil] setValue: [NSNumber numberWithInt: height] forKey: @"height"];
+		}
+
+		if( height > savedHeightInDB && fExternalOwnedImage)
+		    height = savedHeightInDB;
+
+		if( savedWidthInDB != 0 && savedWidthInDB != width)
+		{
+		    if( savedWidthInDB != OsirixDicomImageSizeUnknown)
+			NSLog( @"******* [[imageObj valueForKey:@'width'] intValue] != width. New: %d / DB: %d", (int)width, (int)savedWidthInDB);
+
+		    if( iContext == nil)
+			iContext = ([[NSThread currentThread] isMainThread] ? [[[BrowserController currentBrowser] database] managedObjectContext] : [[[BrowserController currentBrowser] database] independentContext]);
+
+		    [[iContext existingObjectWithID: imageObjectID error: nil] setValue: [NSNumber numberWithInt: width] forKey: @"width"];
+		}
+
+		if( width > savedWidthInDB && fExternalOwnedImage)
+		    width = savedWidthInDB;
+
+		[iContext save: nil];
     #endif
-                unsigned char *srcImage = [TIFFRep bitmapData];
-                
-                unsigned char *argbImage = nil, *srcPtr = nil, *tmpPtr = nil;
-                
-                int totSize = height * width * 4;
-                if( fExternalOwnedImage)
-                    argbImage =	(unsigned char*) fExternalOwnedImage;
-                else
-                    argbImage = malloc( totSize);
-                
-                if( srcImage != nil && argbImage != nil)
+		unsigned char *srcImage = [TIFFRep bitmapData];
+
+		unsigned char *argbImage = nil, *srcPtr = nil, *tmpPtr = nil;
+
+		int totSize = height * width * 4;
+		if( fExternalOwnedImage)
+		    argbImage =	(unsigned char*) fExternalOwnedImage;
+		else
+		    argbImage = malloc( totSize);
+
+		if( srcImage != nil && argbImage != nil)
                 {
-                    int x, y;
-                    
-                    switch( [TIFFRep bitsPerPixel])
+		    int x, y;
+
+		    switch( [TIFFRep bitsPerPixel])
                     {
-                        case 8:
-                            tmpPtr = argbImage;
-                            for( y = 0 ; y < height; y++)
+			case 8:
+			    tmpPtr = argbImage;
+			    for( y = 0 ; y < height; y++)
                             {
-                                srcPtr = srcImage + y*[TIFFRep bytesPerRow];
+				srcPtr = srcImage + y*[TIFFRep bytesPerRow];
                                 
-                                x = width;
-                                while( x-->0)
-                                {
-                                    tmpPtr++;
-                                    *tmpPtr++ = *srcPtr;
-                                    *tmpPtr++ = *srcPtr;
-                                    *tmpPtr++ = *srcPtr;
-                                    srcPtr++;
-                                }
+				x = width;
+				while( x-->0)
+				{
+				    tmpPtr++;
+				    *tmpPtr++ = *srcPtr;
+				    *tmpPtr++ = *srcPtr;
+				    *tmpPtr++ = *srcPtr;
+				    srcPtr++;
+				}
                             }
-                        break;
-                            
-                        case 32:
-                            tmpPtr = argbImage;
-                            for( y = 0 ; y < height; y++)
+			break;
+
+			case 32:
+			    tmpPtr = argbImage;
+			    for( y = 0 ; y < height; y++)
                             {
                                 srcPtr = srcImage + y*[TIFFRep bytesPerRow];
                                 
@@ -9951,51 +7025,51 @@ void erase_outside_circle(char *buf, int width, int height, int cx, int cy, int 
 			
 			@try
 			{
-//				if( gUSEPAPYRUSDCMPIX)
-//				{
+				if( gUSEPAPYRUSDCMPIX)
+				{
 					success = [self loadDICOMPapyrus];
 					
-//                    #ifdef OSIRIX_VIEWER
-//					#ifndef OSIRIX_LIGHT
-//                    if( success == NO)
-//                    {
-//                        // It failed with Papyrus : potential crash with DCMFramework with a corrupted file
-//                        // Only do it, if it failed: writing a file takes time... and slow down reading performances
-//                        
-//                        NSString *recoveryPath = [[[BrowserController currentBrowser] documentsDirectory] stringByAppendingPathComponent:@"/ThumbnailPath"];
-//                        
-//                        [[NSFileManager defaultManager] removeItemAtPath: recoveryPath error: nil];
-//                        
-//                        @try 
-//                        {
-//                            [URIRepresentationAbsoluteString writeToFile: recoveryPath atomically: YES encoding: NSASCIIStringEncoding  error: nil];
-//                            
-//                            //only try again if is strict DICOM
-//                            if (success == NO && [DCMObject isDICOM:[NSData dataWithContentsOfFile: srcFile]])
-//                            {
-//                                NSLog( @"DCMPix: Papyrus failed. Try DCMFramework : %@", srcFile);
-//                                success = [self loadDICOMDCMFramework];
-//                            }
-//                            
-//                            [[NSFileManager defaultManager] removeItemAtPath: recoveryPath error: nil];
-//                        }
-//                        @catch (NSException * e) 
-//                        {
-//                            NSLog( @"***** exception in %s: %@", __PRETTY_FUNCTION__, e);
-//                        }
-//                    }
-//					#endif
-//                    #endif
-//				}
-//				#ifndef OSIRIX_LIGHT
-//				else
-//				{
-//					success = [self loadDICOMDCMFramework];
-//					
-//					if (success == NO && [DCMObject isDICOM:[NSData dataWithContentsOfFile:srcFile]])
-//						success = [self loadDICOMPapyrus];
-//				}
-//				#endif
+                    #ifdef OSIRIX_VIEWER
+					#ifndef OSIRIX_LIGHT
+                    if( success == NO)
+                    {
+                        // It failed with Papyrus : potential crash with DCMFramework with a corrupted file
+                        // Only do it, if it failed: writing a file takes time... and slow down reading performances
+                        
+                        NSString *recoveryPath = [[[BrowserController currentBrowser] documentsDirectory] stringByAppendingPathComponent:@"/ThumbnailPath"];
+                        
+                        [[NSFileManager defaultManager] removeItemAtPath: recoveryPath error: nil];
+                        
+                        @try 
+                        {
+                            [URIRepresentationAbsoluteString writeToFile: recoveryPath atomically: YES encoding: NSASCIIStringEncoding  error: nil];
+                            
+                            //only try again if is strict DICOM
+                            if (success == NO && [DCMObject isDICOM:[NSData dataWithContentsOfFile: srcFile]])
+                            {
+                                NSLog( @"DCMPix: Papyrus failed. Try DCMFramework : %@", srcFile);
+                                success = [self loadDICOMDCMFramework];
+                            }
+                            
+                            [[NSFileManager defaultManager] removeItemAtPath: recoveryPath error: nil];
+                        }
+                        @catch (NSException * e) 
+                        {
+                            NSLog( @"***** exception in %s: %@", __PRETTY_FUNCTION__, e);
+                        }
+                    }
+					#endif
+                    #endif
+				}
+				#ifndef OSIRIX_LIGHT
+				else
+				{
+					success = [self loadDICOMDCMFramework];
+					
+					if (success == NO && [DCMObject isDICOM:[NSData dataWithContentsOfFile:srcFile]])
+						success = [self loadDICOMPapyrus];
+				}
+				#endif
 				
 				if( numberOfFrames <= 1)
 					[self clearCachedPapyGroups];
@@ -10016,7 +7090,7 @@ void erase_outside_circle(char *buf, int width, int height, int cx, int cy, int 
 		
 		if( success == NO)	// Is it a NON-DICOM IMAGE ??
 		{
-			PapyULong		i;
+			long		i;
 			
 			NSImage		*otherImage = nil;
 			NSString	*extension = [[srcFile pathExtension] lowercaseString];
@@ -10864,7 +7938,7 @@ void erase_outside_circle(char *buf, int width, int height, int cx, int cy, int 
             }
             
 #ifdef OSIRIX_VIEWER
-			[self loadCustomImageAnnotationsPapyLink:-1];
+			[self loadCustomImageAnnotationsPapyLink:-1 DCMLink:nil];
 #endif
 		}
 		
@@ -11484,10 +8558,7 @@ void erase_outside_circle(char *buf, int width, int height, int cx, int cy, int 
 	
 	[c orientationDouble: o];
 	
-	for( int i = 0 ; i < 9; i ++)
-    {
-        if( fabs( o[ i] - orientation[ i]) > ORIENTATION_SENSIBILITY) return NO;
-    }
+	for( int i = 0 ; i < 9; i ++) if( o[ i] != orientation[ i]) return NO;
 	
 	return YES;
 }
@@ -13317,186 +10388,6 @@ void erase_outside_circle(char *buf, int width, int height, int cx, int cy, int 
 
 #ifdef OSIRIX_VIEWER
 
-- (void) appendSElement: (SElement*) inGrOrModP toString: (NSMutableString*) field papyLink:(PapyShort)fileNb
-{
-    if( inGrOrModP->nb_val > 0)
-    {
-        UValue_T *theValueP = inGrOrModP->value;
-        for ( int k = 0; k < inGrOrModP->nb_val; k++, theValueP++)
-        {
-            if(inGrOrModP->vr==DS)	// floating point string
-            {
-                if( theValueP->a) [field appendString:[NSString stringWithFormat:@"%.6g", atof( theValueP->a)]];
-            }
-            else if(inGrOrModP->vr==FL)	// floating point string
-            {
-                [field appendString:[NSString stringWithFormat:@"%.6g", theValueP->fl]];
-            }
-            else if( inGrOrModP->vr==FD)
-            {
-                [field appendString:[NSString stringWithFormat:@"%.6g", (float) theValueP->fd]];
-            }
-            else if(inGrOrModP->vr==UL)
-                [field appendString:[NSString stringWithFormat:@"%d", (int) theValueP->ul]];
-            else if(inGrOrModP->vr==USS)
-                [field appendString:[NSString stringWithFormat:@"%d", (int) theValueP->us]];
-            else if(inGrOrModP->vr==SL)
-                [field appendString:[NSString stringWithFormat:@"%d", (int) theValueP->sl]];
-            else if(inGrOrModP->vr==SS)
-                [field appendString:[NSString stringWithFormat:@"%d", (int) theValueP->ss]];
-            else if(inGrOrModP->vr==SQ)
-            {
-                NSMutableString *temp = [NSMutableString string];
-                
-                // Loop over sequence
-                if(theValueP->sq!=NULL)
-                {
-                    Papy_List *dcmList = theValueP->sq->object->item;
-                    while(dcmList!=NULL)
-                    {
-                        SElement *gr = (SElement *)dcmList->object->group;
-                        
-                        //if(gr->value)
-                        [temp appendString:[self getDICOMFieldValueForGroup:gr->group element:gr->element papyLink:fileNb]];
-                        //										if(gr->value!=NULL)
-                        //                                            NSLog(@"++**++   ::    %@", [NSString stringWithCString:gr->value->a encoding:NSASCIIStringEncoding]);
-                        //										else
-                        //                                            NSLog(@"++**++   ::    %@", [NSString stringWithCString:gr->vm encoding:NSASCIIStringEncoding]);
-                        
-                        dcmList = dcmList->next;
-                    }
-                }
-                [field appendString:[NSString stringWithString:temp]];
-                //								NSLog(@"SQ field : %@", field);
-            }
-            else if(inGrOrModP->vr==DA)
-            {
-                if( theValueP->a)
-                {
-                    NSCalendarDate *calendarDate = [DCMCalendarDate dicomDate: [NSString stringWithCString:theValueP->a encoding:NSASCIIStringEncoding]];
-                    [field appendString:[[NSUserDefaults dateFormatter] stringFromDate:calendarDate]];
-                }
-            }
-            else if(inGrOrModP->vr==DT)
-            {
-                if( theValueP->a)
-                {
-                    NSCalendarDate *calendarDate = [DCMCalendarDate dicomDateTime: [NSString stringWithCString:theValueP->a encoding:NSASCIIStringEncoding]];
-                    [field appendString:[BrowserController DateTimeWithSecondsFormat: calendarDate]];
-                }
-            }
-            else if(inGrOrModP->vr==TM)
-            {
-                if( theValueP->a)
-                {
-                    NSCalendarDate *calendarDate = [DCMCalendarDate dicomTime: [NSString stringWithCString:theValueP->a encoding:NSASCIIStringEncoding]];
-                    [field appendString:[BrowserController TimeWithSecondsFormat: calendarDate]];
-                }
-            }
-            else if(inGrOrModP->vr==AS)
-            {
-                if( theValueP->a)
-                {
-                    NSString *v = [NSString stringWithCString:theValueP->a encoding:NSASCIIStringEncoding];
-                    //Age String Format mmmM,dddD,nnnY ie 018Y
-                    if( v.length >= 4)
-                    {
-                        int number = [[v substringWithRange:NSMakeRange(0, 3)] intValue];
-                        NSString *letter = [v substringWithRange:NSMakeRange(3, 1)];
-                        [field appendString:[NSString stringWithFormat:@"%d %@", number, [letter lowercaseString]]];
-                    }
-                }
-            }
-            else if( theValueP->a)
-                [field appendString:[NSString stringWithCString:theValueP->a encoding:NSASCIIStringEncoding]];
-            
-            if(inGrOrModP->nb_val>1 && k<inGrOrModP->nb_val-1)
-                [field appendString:@" / "];
-        }
-    }
-}
-
-- (NSString*)getDICOMFieldValueForGroup:(int)group element:(int)element papyLink:(PapyShort)fileNb;
-{
-	NSMutableString *field = [NSMutableString string];
-	
-	SElement *inGrOrModP = 0L;
-	int error = 0;
-    
-	if( group)
-		inGrOrModP = [self getPapyGroup: group error: &error];
-	
-	if( inGrOrModP)
-	{
-		int theEnumGrNb = Papy3ToEnumGroup(group);
-		int theMaxElem = gArrGroup [theEnumGrNb].size;
-		
-		BOOL elementDefinitionFound = NO;
-		
-		for( int j = 0; j < theMaxElem; j++, inGrOrModP++)
-		{
-			if( inGrOrModP->element == element) {
-                
-				elementDefinitionFound = YES;
-				
-                [self appendSElement: inGrOrModP toString: field papyLink: fileNb];
-			}
-		}
-        
-        if( elementDefinitionFound == NO)
-        {
-            // Does it exist in the undefined elements / groups ?
-            
-            SElement *ulements = (SElement*) unknownElements[ fileNb];
-            
-            for( int i = 0 ; i < unKnownElementsNumber[ fileNb]; i++)
-            {
-                if( ulements[ i].group == group && ulements[ i].element == element)
-                {
-                    [self appendSElement: &ulements[ i] toString: field papyLink: fileNb];
-                    
-                    break;
-                }
-            }
-        }
-    }
-    
-//    if( error != 0)	// Papyrus doesn't have the definition of all dicom tags.... Papyrus can only read what is in his dictionary
-//    {
-//#ifndef NDEBUG
-//        NSLog( @"--- warning: annotation definition not found for : %X %X. Will use DCMTK to load the file", group, element);
-//#endif
-//        @synchronized( cachedDCMTKFileFormat)
-//        {
-//            if( self.dcmtkDcmFileFormat == nil)
-//            {
-//                if( [cachedDCMTKFileFormat objectForKey: srcFile])
-//                {
-//                    NSMutableDictionary *dic = [cachedDCMTKFileFormat objectForKey: srcFile];
-//                    
-//                    self.dcmtkDcmFileFormat = [dic objectForKey: @"dcmtkObject"];
-//                    [dic setValue: @([[dic objectForKey: @"count"] intValue]+1) forKey: @"count"];
-//                }
-//                else
-//                {
-//                    self.dcmtkDcmFileFormat = [[[DCMTKFileFormat alloc] initWithFile: srcFile] autorelease];
-//                    
-//                    NSMutableDictionary *dic = [NSMutableDictionary dictionary];
-//                    
-//                    [dic setValue: @1 forKey: @"count"];
-//                    [dic setValue: self.dcmtkDcmFileFormat forKey: @"dcmtkObject"];
-//                    
-//                    [cachedDCMTKFileFormat setObject: dic forKey: srcFile];
-//                }
-//            }
-//            
-//            return [DicomFile getDicomFieldForGroup: group element: element forDcmFileFormat: dcmtkDcmFileFormat.dcmtkDcmFileFormat];
-//        }
-//	}
-    
-	return field;
-}
-
 #ifndef OSIRIX_LIGHT
 - (NSString*)getDICOMFieldValueForGroup:(int)group element:(int)element DCMLink:(DCMObject*)dcmObject
 {
@@ -13658,7 +10549,7 @@ void erase_outside_circle(char *buf, int width, int height, int cx, int cy, int 
 #endif
 }
 
-- (void)loadCustomImageAnnotationsPapyLink:(int)fileNb
+- (void)loadCustomImageAnnotationsPapyLink:(int)fileNb DCMLink:(DCMObject*)dcmObject
 {
 	@try
 	{
@@ -13709,12 +10600,10 @@ void erase_outside_circle(char *buf, int width, int height, int cx, int cy, int 
                                     {	
                                         value = [NSString stringWithFormat:@"%.6g", [echotime floatValue]];;
                                     }
-                                    else if(fileNb>=0)
-                                        value = [self getDICOMFieldValueForGroup:[[field objectForKey:@"group"] intValue] element:[[field objectForKey:@"element"] intValue] papyLink:fileNb];
-//                                    #ifndef OSIRIX_LIGHT
-//                                    else if(dcmObject)
-//                                        value = [self getDICOMFieldValueForGroup:[[field objectForKey:@"group"] intValue] element:[[field objectForKey:@"element"] intValue] DCMLink:dcmObject];
-//                                    #endif
+                                    #ifndef OSIRIX_LIGHT
+                                    else if(dcmObject)
+                                        value = [self getDICOMFieldValueForGroup:[[field objectForKey:@"group"] intValue] element:[[field objectForKey:@"element"] intValue] DCMLink:dcmObject];
+                                    #endif
                                     else
                                         value = nil;
                                     

@@ -374,7 +374,7 @@ void ConnectPipelines(ITK_Exporter exporter, VTK_Importer* importer)
 	vtkMarchingSquares*		isoContour = vtkMarchingSquares::New();
 	
 	isoContour->SetValue(0, 1);
-	isoContour->SetInput( (vtkDataObject*) image2D->GetOutput());
+	isoContour->SetInputData( (vtkDataObject*) image2D->GetOutput());
 	isoContour->Update();
 
 	image2D->GetDataExtent( dataExtent);
@@ -383,16 +383,17 @@ void ConnectPipelines(ITK_Exporter exporter, VTK_Importer* importer)
 	filter->SetColorRegions( 1);
 	if( largestRegion) filter->SetExtractionModeToLargestRegion();
 	else filter->SetExtractionModeToAllRegions();
-	filter->SetInput( isoContour->GetOutput());
+	filter->SetInputData( isoContour->GetOutput());
 
 	vtkPolyDataConnectivityFilter	*filter2 = vtkPolyDataConnectivityFilter::New();
 	filter2->SetColorRegions( 1);
 	if( largestRegion) filter2->SetExtractionModeToLargestRegion();
 	else filter2->SetExtractionModeToAllRegions();
-	filter2->SetInput( filter->GetOutput());
+	filter2->SetInputData( filter->GetOutput());
 
+    filter2->Update();
 	vtkPolyData *output = filter2->GetOutput();
-	output->Update();
+	//output->Update();
 	
 //	NSLog( @"Extracted region: %d", filter2->GetNumberOfExtractedRegions());
 //	NSLog( @"Lines: %d Polys: %d, Points: %d", output->GetNumberOfLines(), output->GetNumberOfPolys(), output->GetNumberOfPoints());
@@ -890,7 +891,7 @@ void ConnectPipelines(ITK_Exporter exporter, VTK_Importer* importer)
                 //	vtkMarchingSquares*		isoContour = vtkMarchingSquares::New();
                     
                     isoContour->SetValue(0, 1);
-                    isoContour->SetInput( (vtkDataObject*) image2D->GetOutput());
+		    isoContour->SetInputData( (vtkDataObject*) image2D->GetOutput());
                     isoContour->Update();
 
                     image2D->GetDataExtent( dataExtent);
@@ -899,13 +900,14 @@ void ConnectPipelines(ITK_Exporter exporter, VTK_Importer* importer)
                     vtkPolyDataConnectivityFilter	*filter = vtkPolyDataConnectivityFilter::New();
                     filter->SetColorRegions( 1);
                     filter->SetExtractionModeToLargestRegion();
-                    filter->SetInput( isoContour->GetOutput());
+		    filter->SetInputData( isoContour->GetOutput());
                     
                     vtkPolyDataConnectivityFilter	*filter2 = vtkPolyDataConnectivityFilter::New();
                     filter2->SetColorRegions( 1);
                     filter2->SetExtractionModeToLargestRegion();
-                    filter2->SetInput( filter->GetOutput());
+		    filter2->SetInputData( filter->GetOutput());
                     
+		    filter2->Update();
                     vtkPolyData *output = filter2->GetOutput();
                     
         //			filter->SetExtractionModeToAllRegions();
@@ -926,7 +928,7 @@ void ConnectPipelines(ITK_Exporter exporter, VTK_Importer* importer)
         //				filter->DeleteSpecifiedRegion(i);
         //			}
                     
-                    output->Update();
+		   // output->Update();
     //				NSLog( @"Extracted region: %d", filter->GetNumberOfExtractedRegions());				
     //				NSLog( @"Lines: %d Polys: %d, Points: %d", output->GetNumberOfLines(), output->GetNumberOfPolys(), output->GetNumberOfPoints());
                     

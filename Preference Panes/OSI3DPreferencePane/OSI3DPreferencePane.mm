@@ -15,7 +15,7 @@
 #import "OSI3DPreferencePane.h"
 
 #ifndef OSIRIX_LIGHT
-#import "VTKView.h"
+#import "VTKViewOSIRIX.h"
 #endif
 
 @implementation OSI3DPreferencePanePref

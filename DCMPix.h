@@ -627,6 +627,12 @@ Note setter is different to not break existing usage. :-( */
 
 - (void) checkImageAvailble:(float)newWW :(float)newWL;
 
+/** Load the DICOM image using the DCMFramework.  
+* There should be no reason to call this. The class will call it when needed. */
+#ifndef OSIRIX_LIGHT
+- (BOOL)loadDICOMDCMFramework;
+#endif
+
 /** Load the DICOM image using Papyrus.
 * There should be no reason to call this. The class will call it when needed.
 */
@@ -686,14 +692,8 @@ Note setter is different to not break existing usage. :-( */
 + (BOOL) isRunOsiriXInProtectedModeActivated;
 
 /** Clears the papyrus group cache */
-- (void) clearCachedPapyGroups;
 - (void) clearCachedDCMFrameworkFiles;
 + (void) purgeCachedDictionaries;
-
-/** Returns a pointer the the papyrus group
-* @param group group
-*/
-- (void *) getPapyGroup: (int)group;
 
 + (double) moment: (float *) x length:(long) length mean: (double) mean order: (int) order;
 + (double) skewness: (float*) data length: (long) length mean: (double) mean;
@@ -707,8 +707,8 @@ Note setter is different to not break existing usage. :-( */
 #ifdef OSIRIX_VIEWER
 /** Custom Annotations */
 - (void)loadCustomImageAnnotationsDBFields: (DicomImage*) imageObj;
-- (void)loadCustomImageAnnotationsPapyLink:(int)fileNb;
-- (NSString*) getDICOMFieldValueForGroup:(int)group element:(int)element papyLink:(short)fileNb;
+- (void)loadCustomImageAnnotationsPapyLink:(int)fileNb DCMLink:(DCMObject*)dcmObject;
+
 
 #ifndef OSIRIX_LIGHT
 - (NSString*) getDICOMFieldValueForGroup:(int)group element:(int)element DCMLink:(DCMObject*)dcmObject;
