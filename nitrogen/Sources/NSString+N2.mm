@@ -20,10 +20,6 @@
 #include <CommonCrypto/CommonDigest.h>
 
 
-NSString* N2NonNullString(NSString* s) {
-	return s? s : @"";
-}
-
 @implementation NSString (N2)
 
 - (NSString *)stringByTruncatingToLength:(NSInteger)theWidth

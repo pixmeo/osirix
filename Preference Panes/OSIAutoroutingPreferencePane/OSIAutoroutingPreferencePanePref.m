@@ -14,8 +14,8 @@
 
 #import <OsiriX/DCMObject.h>
 #import "OSIAutoroutingPreferencePanePref.h"
-#import <OsiriXAPI/NSPreferencePane+OsiriX.h>
-#import <OsiriXAPI/AppController.h>
+#import <NSPreferencePane+OsiriX.h>
+#import <AppController.h>
 
 #define CURRENTVERSION 1
 

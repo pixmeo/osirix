@@ -14,7 +14,7 @@
 
 #import <PreferencePanes/PreferencePanes.h>
 
-#import <OsiriXAPI/DICOMTLS.h>
+#import <DICOMTLS.h>
 
 @interface OSIListenerPreferencePanePref : NSPreferencePane 
 {

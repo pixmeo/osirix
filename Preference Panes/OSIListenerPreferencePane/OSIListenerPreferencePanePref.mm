@@ -13,13 +13,13 @@
 =========================================================================*/
 
 #import "OSIListenerPreferencePanePref.h"
-#import <OsiriXAPI/DefaultsOsiriX.h>
-#import <OsiriXAPI/BrowserController.h>
-#import <OsiriXAPI/NSUserDefaultsController+OsiriX.h>
+#import <DefaultsOsiriX.h>
+#import <BrowserController.h>
+#import <NSUserDefaultsController+OsiriX.h>
 //#import "DDKeychain.h"
 #import <SecurityInterface/SFChooseIdentityPanel.h>
-#import <OsiriXAPI/WebPortal.h>
-#import <OsiriXAPI/WebPortalDatabase.h>
+#import <WebPortal.h>
+#import <WebPortalDatabase.h>
 #import "NSAppleScript+N2.h"
 
 #include <netdb.h>

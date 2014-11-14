@@ -16,15 +16,15 @@
 #import <SecurityInterface/SFCertificateView.h>
 #import "WebPortalUser.h"
 #import "OSIWebSharingPreferencePanePref.h"
-#import <OsiriXAPI/DefaultsOsiriX.h>
-#import <OsiriXAPI/NSUserDefaults+OsiriX.h>
-#import <OsiriXAPI/BrowserController.h>
-#import <OsiriXAPI/AppController.h>
-#import <OsiriXAPI/NSFileManager+N2.h>
-#import <OsiriXAPI/WebPortal.h>
-#import <OsiriXAPI/WebPortalDatabase.h>
-#import <OsiriXAPI/DicomDatabase.h>
-#import <OsiriXAPI/DicomStudy.h>
+#import <DefaultsOsiriX.h>
+#import <NSUserDefaults+OsiriX.h>
+#import <BrowserController.h>
+#import <AppController.h>
+#import <NSFileManager+N2.h>
+#import <WebPortal.h>
+#import <WebPortalDatabase.h>
+#import <DicomDatabase.h>
+#import <DicomStudy.h>
 
 #import "DDKeychain.h"
 

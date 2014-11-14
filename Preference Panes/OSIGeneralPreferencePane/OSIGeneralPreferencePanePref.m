@@ -14,10 +14,10 @@
 
 
 #import "OSIGeneralPreferencePanePref.h"
-#import <OsiriXAPI/NSPreferencePane+OsiriX.h>
-#import <OsiriXAPI/AppController.h>
-#import <OsiriXAPI/DefaultsOsiriX.h>
-#import <OsiriXAPI/N2Debug.h>
+#import <NSPreferencePane+OsiriX.h>
+#import <AppController.h>
+#import <DefaultsOsiriX.h>
+#import <N2Debug.h>
 
 static NSArray *languagesToMoveWhenQuitting = nil;
 
