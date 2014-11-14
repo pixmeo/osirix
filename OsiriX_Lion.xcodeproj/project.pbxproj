@@ -247,6 +247,8 @@
 		843F847B12439E00004FBBF6 /* AYDicomPrintPref.h in Headers */ = {isa = PBXBuildFile; fileRef = 843F847A12439E00004FBBF6 /* AYDicomPrintPref.h */; };
 		8440039A0E8CF99500A00EBD /* dciodvfy in Resources */ = {isa = PBXBuildFile; fileRef = 844003990E8CF99500A00EBD /* dciodvfy */; };
 		84701B2E1A15E7B7007825C7 /* NSString+N2.mm in Sources */ = {isa = PBXBuildFile; fileRef = 84701B2D1A15E7B7007825C7 /* NSString+N2.mm */; };
+		84701B311A15EBBA007825C7 /* OsiriXHeaders.mm in Sources */ = {isa = PBXBuildFile; fileRef = 847AFCA81A14DFA30067AA07 /* OsiriXHeaders.mm */; };
+		84701B321A15EBD0007825C7 /* OsiriXAPI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 84701B2F1A15E872007825C7 /* OsiriXAPI.framework */; };
 		8476BC2F1599D4B200451331 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8476BC2E1599D4B200451331 /* AVFoundation.framework */; };
 		8476BC321599D51300451331 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8476BC2E1599D4B200451331 /* AVFoundation.framework */; };
 		8476BC341599D7E900451331 /* CoreMedia.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8476BC331599D7E900451331 /* CoreMedia.framework */; };
@@ -12295,6 +12297,7 @@
 				CEBD79AA14F1AD6B000DA1FE /* libvtkIO.a in Frameworks */,
 				CEBD79AB14F1AD6B000DA1FE /* libvtkRendering.a in Frameworks */,
 				CEBD79AC14F1AD6B000DA1FE /* libvtkFiltering.a in Frameworks */,
+				84701B321A15EBD0007825C7 /* OsiriXAPI.framework in Frameworks */,
 				CEBD79AD14F1AD6B000DA1FE /* libvtkImaging.a in Frameworks */,
 				CEBD79AE14F1AD6B000DA1FE /* libvtkCommon.a in Frameworks */,
 				CEBD79AF14F1AD6B000DA1FE /* libvtkVolumeRendering.a in Frameworks */,
@@ -24156,6 +24159,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				84701B311A15EBBA007825C7 /* OsiriXHeaders.mm in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

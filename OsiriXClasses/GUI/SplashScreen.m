@@ -120,11 +120,10 @@ BOOL useQuartz() {
 	switch( versionType)
     {
         case 0:
-            currVersionNumber = [NSMutableString stringWithString:[[[NSBundle bundleForClass:[self class]] infoDictionary] objectForKey:@"CFBundleGetInfoString"]];
             if( sizeof(long) == 8)
-                [currVersionNumber appendString:@" 64-bit"];
+                [currVersionNumber setString:@" 64-bit"];
             else
-                [currVersionNumber appendString:@" 32-bit"];
+                [currVersionNumber setString:@" 32-bit"];
         break;
         
         case 1:
