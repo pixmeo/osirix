@@ -831,7 +831,6 @@
 		847AFF4E1A14DFA50067AA07 /* OSIWindow.m in Sources */ = {isa = PBXBuildFile; fileRef = 847AFCA51A14DFA30067AA07 /* OSIWindow.m */; };
 		847AFF4F1A14DFA50067AA07 /* OSIWindowController.h in Headers */ = {isa = PBXBuildFile; fileRef = 847AFCA61A14DFA30067AA07 /* OSIWindowController.h */; };
 		847AFF501A14DFA50067AA07 /* OSIWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 847AFCA71A14DFA30067AA07 /* OSIWindowController.m */; };
-		847AFF511A14DFA50067AA07 /* OsiriXHeaders.mm in Sources */ = {isa = PBXBuildFile; fileRef = 847AFCA81A14DFA30067AA07 /* OsiriXHeaders.mm */; };
 		847AFF521A14DFA50067AA07 /* ROI.h in Headers */ = {isa = PBXBuildFile; fileRef = 847AFCAA1A14DFA30067AA07 /* ROI.h */; };
 		847AFF531A14DFA50067AA07 /* ROI.m in Sources */ = {isa = PBXBuildFile; fileRef = 847AFCAB1A14DFA30067AA07 /* ROI.m */; };
 		847AFF541A14DFA50067AA07 /* ROIDefaultsWindow.h in Headers */ = {isa = PBXBuildFile; fileRef = 847AFCAC1A14DFA30067AA07 /* ROIDefaultsWindow.h */; };
@@ -24470,7 +24469,6 @@
 				847AFD601A14DFA30067AA07 /* MPRDCMView.m in Sources */,
 				BFBF3F0009B6828D00545F5E /* dcvrul.cc in Sources */,
 				BFBF3F0209B6828D00545F5E /* dcvrulup.cc in Sources */,
-				847AFF511A14DFA50067AA07 /* OsiriXHeaders.mm in Sources */,
 				847AFE1C1A14DFA40067AA07 /* DicomDir.mm in Sources */,
 				BFBF3F0409B6828D00545F5E /* dcvrus.cc in Sources */,
 				BFBF3F0609B6828D00545F5E /* dcvrut.cc in Sources */,
