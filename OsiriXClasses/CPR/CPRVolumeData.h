@@ -242,10 +242,16 @@ v   =  t0 + (z)*(t1-t0);
 
 CF_INLINE float CPRVolumeDataNearestNeighborInterpolatedFloatAtVolumeCoordinate(CPRVolumeDataInlineBuffer *inlineBuffer, CGFloat x, CGFloat y, CGFloat z) // coordinate in the pixel space
 {
-    NSInteger roundX = (x + 0.5f);
-    NSInteger roundY = (y + 0.5f);
-    NSInteger roundZ = (z + 0.5f);
-        
+#if CGFLOAT_IS_DOUBLE
+    NSInteger roundX = round(x);
+    NSInteger roundY = round(y);
+    NSInteger roundZ = round(z);
+#else
+    NSInteger roundX = roundf(x);
+    NSInteger roundY = roundf(y);
+    NSInteger roundZ = roundf(z);
+#endif
+
     return CPRVolumeDataGetFloatAtPixelCoordinate(inlineBuffer, roundX, roundY, roundZ);
 }
 
