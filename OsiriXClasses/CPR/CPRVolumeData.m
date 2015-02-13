@@ -483,6 +483,19 @@
     return N3AffineTransformDeterminant(transform) != 0.0;
 }
 
+- (NSString *)description
+{
+	NSMutableString *description = [NSMutableString string];
+	[description appendString:NSStringFromClass([self class])];
+	[description appendString:[NSString stringWithFormat: @"\nPixels Wide: %lld\n", (long long)_pixelsWide]];
+	[description appendString:[NSString stringWithFormat: @"Pixels High: %lld\n", (long long)_pixelsHigh]];
+	[description appendString:[NSString stringWithFormat: @"Pixels Deep: %lld\n", (long long)_pixelsDeep]];
+	[description appendString:[NSString stringWithFormat: @"Out of Bounds Value: %f\n", _outOfBoundsValue]];
+	[description appendString:[NSString stringWithFormat: @"Volume Transform:\n%@\n", NSStringFromN3AffineTransform(_volumeTransform)]];
+
+	return description;
+}
+
 @end
 
 @implementation CPRVolumeData (DCMPixAndVolume)

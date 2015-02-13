@@ -19,13 +19,12 @@
 
 CF_EXTERN_C_BEGIN
 
-enum _CPRInterpolationMode {
-    CPRInterpolationModeLinear, // don't use this, it is not implemented
+typedef NS_ENUM(NSInteger, CPRInterpolationMode) {
+    CPRInterpolationModeLinear,
     CPRInterpolationModeNearestNeighbor,
 	
-	CPRInterpolationModeNone = 0xFFFFFF,
+    CPRInterpolationModeNone = 0xFFFFFF,
 };
-typedef NSInteger CPRInterpolationMode;
 
 typedef struct { // build one of these on the stack and then use -[CPRVolumeData aquireInlineBuffer:] to initialize it. Then make sure to release it too!
     const float *floatBytes;
