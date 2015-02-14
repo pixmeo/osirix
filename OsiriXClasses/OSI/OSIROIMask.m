@@ -15,6 +15,23 @@
 #import "OSIROIMask.h"
 #import "OSIFloatVolumeData.h"
 #import "OSIROIMaskRunStack.h"
+#include <Accelerate/Accelerate.h>
+
+OSIROIMaskRun OSIROIMaskRunMake(NSRange widthRange, NSUInteger heightIndex, NSUInteger depthIndex, float intensity)
+{
+    OSIROIMaskRun maskRun = {widthRange, heightIndex, depthIndex, intensity};
+    return maskRun;
+}
+
+NSUInteger OSIROIMaskRunFirstWidthIndex(OSIROIMaskRun maskRun)
+{
+    return maskRun.widthRange.location;
+}
+
+NSUInteger OSIROIMaskRunLastWidthIndex(OSIROIMaskRun maskRun)
+{
+    return NSMaxRange(maskRun.widthRange) - 1;
+}
 
 const OSIROIMaskRun OSIROIMaskRunZero = {{0.0, 0.0}, 0, 0, 1.0};
 
@@ -120,6 +137,11 @@ BOOL OSIROIMaskRunsAbut(OSIROIMaskRun maskRun1, OSIROIMaskRun maskRun2)
     return NO;
 }
 
+N3Vector OSIROIMaskIndexApplyTransform(OSIROIMaskIndex maskIndex, N3AffineTransform transform)
+{
+    return N3VectorApplyTransform(N3VectorMake(maskIndex.x, maskIndex.y, maskIndex.z), transform);
+}
+
 BOOL OSIROIMaskIndexInRun(OSIROIMaskIndex maskIndex, OSIROIMaskRun maskRun)
 {
 	if (maskIndex.y != maskRun.heightIndex || maskIndex.z != maskRun.depthIndex) {
@@ -155,13 +177,89 @@ NSArray *OSIROIMaskIndexesInRun(OSIROIMaskRun maskRun)
 
 @implementation OSIROIMask
 
-+ (id)ROIMask
++ (instancetype)ROIMask
 {
     return [[[[self class] alloc] init] autorelease];
 }
 
 
-+ (id)ROIMaskFromVolumeData:(OSIFloatVolumeData *)floatVolumeData
++ (instancetype)ROIMaskWithSphereDiameter:(NSUInteger)diameter
+{
+    return [self ROIMaskWithElipsoidWidth:diameter height:diameter depth:diameter];
+}
+
++ (instancetype)ROIMaskWithCubeSize:(NSUInteger)size
+{
+    return [[self class] ROIMaskWithBoxWidth:size height:size depth:size];
+}
+
++ (instancetype)ROIMaskWithBoxWidth:(NSUInteger)width height:(NSUInteger)height depth:(NSUInteger)depth;
+{
+    NSUInteger i = 0;
+    NSUInteger j = 0;
+    
+    OSIROIMaskRun *maskRuns = malloc(width * height * sizeof(OSIROIMaskRun));
+    memset(maskRuns, 0, width * height * sizeof(OSIROIMaskRun));
+    
+    for (j = 0; j < height; j++) {
+        for (i = 0; i < depth; i++) {
+            maskRuns[(i*depth)+j] = OSIROIMaskRunMake(NSMakeRange(0, width), i, j, 1);
+        }
+    }
+
+    return [[[OSIROIMask alloc] initWithSortedMaskRunData:[NSData dataWithBytesNoCopy:maskRuns length:width * height * sizeof(OSIROIMaskRun) freeWhenDone:YES]] autorelease];
+}
+
++ (instancetype)ROIMaskWithElipsoidWidth:(NSUInteger)width height:(NSUInteger)height depth:(NSUInteger)depth
+{
+    NSUInteger i = 0;
+    NSUInteger j = 0;
+    NSUInteger k = 0;
+
+    OSIROIMaskRun *maskRuns = malloc(height * depth * sizeof(OSIROIMaskRun));
+    memset(maskRuns, 0, height * depth * sizeof(OSIROIMaskRun));
+
+    CGFloat widthRadius = 0.5*(CGFloat)width;
+    CGFloat heightRadius = 0.5*(CGFloat)height;
+    CGFloat depthRadius = 0.5*(CGFloat)depth;
+    NSInteger whiteSpace = 0;
+
+    for (j = 0; j < depth; j++) {
+        for (i = 0; i < height; i++) {
+#if CGFLOAT_IS_DOUBLE
+            CGFloat x = abs(((CGFloat)i)+.5-heightRadius);
+            CGFloat y = abs(((CGFloat)j)+.5-depthRadius);
+            if (radius*radius < x*x + y*y) {
+                whiteSpace = -1;
+            } else {
+                whiteSpace = round(widthRadius - sqrt(widthRadius*widthRadius - x*x - y*y));
+            }
+#else
+            CGFloat x = fabs(((CGFloat)i)+.5f-heightRadius);
+            CGFloat y = fabs(((CGFloat)j)+.5f-depthRadius);
+            if (widthRadius*widthRadius < x*x + y*y) {
+                whiteSpace = -1;
+            } else {
+                whiteSpace = round(widthRadius - sqrt(widthRadius*widthRadius - x*x - y*y));
+            }
+#endif
+            if (whiteSpace >= 0) {
+                maskRuns[k] = OSIROIMaskRunMake(NSMakeRange(whiteSpace, width - (2 * whiteSpace)), i, j, 1);
+                k++;
+            }
+        }
+    }
+
+    return [[[OSIROIMask alloc] initWithSortedMaskRunData:[NSData dataWithBytesNoCopy:maskRuns length:k * sizeof(OSIROIMaskRun) freeWhenDone:YES]] autorelease];
+}
+
++ (instancetype)ROIMaskFromVolumeData:(OSIFloatVolumeData *)floatVolumeData __deprecated
+{
+    return [self ROIMaskFromVolumeData:floatVolumeData volumeTransform:NULL];
+}
+
+
++ (id)ROIMaskFromVolumeData:(OSIFloatVolumeData *)floatVolumeData volumeTransform:(N3AffineTransformPointer)volumeTransformPtr
 {
     NSInteger i;
     NSInteger j;
@@ -210,6 +308,10 @@ NSArray *OSIROIMaskIndexesInRun(OSIROIMaskRun maskRun)
         }
     }
 
+    if (volumeTransformPtr) {
+        *volumeTransformPtr = floatVolumeData.volumeTransform;
+    }
+
     return [[[[self class] alloc] initWithMaskRuns:maskRuns] autorelease];    
 }
 
@@ -221,7 +323,7 @@ NSArray *OSIROIMaskIndexesInRun(OSIROIMaskRun maskRun)
 	return self;
 }
 
-- (id)initWithMaskRuns:(NSArray *)maskRuns
+- (instancetype)initWithMaskRuns:(NSArray *)maskRuns
 {
 	if ( (self = [super init]) ) {
 		_maskRuns = [[maskRuns sortedArrayUsingFunction:OSIROIMaskCompareRunValues context:NULL] retain];
@@ -230,7 +332,7 @@ NSArray *OSIROIMaskIndexesInRun(OSIROIMaskRun maskRun)
 	return self;
 }
 
-- (id)initWithMaskRunData:(NSData *)maskRunData
+- (instancetype)initWithMaskRunData:(NSData *)maskRunData
 {
     NSMutableData *mutableMaskRunData = [maskRunData mutableCopy];
     
@@ -241,7 +343,7 @@ NSArray *OSIROIMaskIndexesInRun(OSIROIMaskRun maskRun)
     return maskRun;
 }
 
-- (id)initWithSortedMaskRunData:(NSData *)maskRunData
+- (instancetype)initWithSortedMaskRunData:(NSData *)maskRunData
 {
 	if ( (self = [super init]) ) {
 		_maskRunsData = [maskRunData retain];
@@ -250,7 +352,7 @@ NSArray *OSIROIMaskIndexesInRun(OSIROIMaskRun maskRun)
 	return self;
 }
 
-- (id)initWithSortedMaskRuns:(NSArray *)maskRuns
+- (instancetype)initWithSortedMaskRuns:(NSArray *)maskRuns
 {
 	if ( (self = [super init]) ) {
 		_maskRuns = [maskRuns retain];
@@ -259,7 +361,7 @@ NSArray *OSIROIMaskIndexesInRun(OSIROIMaskRun maskRun)
 	return self;
 }
 
-- (id)initWithIndexes:(NSArray *)maskIndexes
+- (instancetype)initWithIndexes:(NSArray *)maskIndexes
 {
     NSMutableData *maskData = [NSMutableData dataWithLength:[maskIndexes count] * sizeof(OSIROIMaskIndex)];
     OSIROIMaskIndex *maskIndexArray = [maskData mutableBytes];
@@ -271,7 +373,7 @@ NSArray *OSIROIMaskIndexesInRun(OSIROIMaskRun maskRun)
     return [self initWithIndexData:maskData];
 }
 
-- (id)initWithIndexData:(NSData *)indexData
+- (instancetype)initWithIndexData:(NSData *)indexData
 {
     if ( (self = [super init]) ) {
         OSIROIMaskIndex *indexes = (OSIROIMaskIndex *)[indexData bytes];
@@ -321,7 +423,7 @@ NSArray *OSIROIMaskIndexesInRun(OSIROIMaskRun maskRun)
 	return self;
 }
 
-- (id)initWithSortedIndexes:(NSArray *)maskIndexes
+- (instancetype)initWithSortedIndexes:(NSArray *)maskIndexes
 {
     NSMutableData *maskData = [NSMutableData dataWithLength:[maskIndexes count] * sizeof(OSIROIMaskIndex)];
     OSIROIMaskIndex *maskIndexArray = [maskData mutableBytes];
@@ -333,7 +435,7 @@ NSArray *OSIROIMaskIndexesInRun(OSIROIMaskRun maskRun)
     return [self initWithSortedIndexData:maskData];
 }
 
-- (id)initWithSortedIndexData:(NSData *)indexData
+- (instancetype)initWithSortedIndexData:(NSData *)indexData
 {
     if ( (self = [super init]) ) {
         OSIROIMaskIndex *indexes = (OSIROIMaskIndex *)[indexData bytes];
@@ -373,9 +475,25 @@ NSArray *OSIROIMaskIndexesInRun(OSIROIMaskRun maskRun)
 	return self;
 }
 
-- (id)copyWithZone:(NSZone *)zone
++ (BOOL)supportsSecureCoding
 {
-    return [[[self class] allocWithZone:zone] initWithSortedMaskRuns:[[[self maskRuns] copy] autorelease]];
+    return YES;
+}
+
+- (instancetype)initWithCoder:(NSCoder *)aDecoder
+{
+    NSData *maskRunsData = [aDecoder decodeObjectOfClass:[NSData class] forKey:@"maskRunsData"];
+    return [self initWithSortedMaskRunData:maskRunsData];
+}
+
+- (void)encodeWithCoder:(NSCoder *)aCoder
+{
+    [aCoder encodeObject:[self maskRunsData] forKey:@"maskRunsData"];
+}
+
+- (instancetype)copyWithZone:(NSZone *)zone
+{
+    return [[[self class] allocWithZone:zone] initWithSortedMaskRunData:[[[self maskRunsData] copy] autorelease]];
 }
 
 - (void)dealloc
@@ -390,28 +508,36 @@ NSArray *OSIROIMaskIndexesInRun(OSIROIMaskRun maskRun)
 
 - (OSIROIMask *)ROIMaskByTranslatingByX:(NSInteger)x Y:(NSInteger)y Z:(NSInteger)z
 {
-    OSIROIMaskRun maskRun;
-    NSValue *maskRunValue;
-    NSMutableArray *newMaskRuns;
-    
-    newMaskRuns = [NSMutableArray arrayWithCapacity:[[self maskRuns] count]];
-    
-    for (maskRunValue in [self maskRuns]) {
-        maskRun = [maskRunValue OSIROIMaskRunValue];
-        
-        assert((NSInteger)maskRun.widthRange.location >= -x);
-        maskRun.widthRange.location += x;
-        
-        assert((NSInteger)maskRun.heightIndex >= -y);
-        maskRun.heightIndex += y;
-        
-        assert((NSInteger)maskRun.depthIndex >= -z);
-        maskRun.depthIndex += z;
-        
-        [newMaskRuns addObject:[NSValue valueWithOSIROIMaskRun:maskRun]];
+    const OSIROIMaskRun *maskRuns = (const OSIROIMaskRun *)[[self maskRunsData] bytes];
+    NSInteger maskRunCount = [self maskRunCount];
+
+    OSIROIMaskRun *newMaskRuns = malloc(maskRunCount * sizeof(OSIROIMaskRun));
+    memset(newMaskRuns, 0, maskRunCount * sizeof(OSIROIMaskRun));
+    NSUInteger newMaskRunsIndex = 0;
+    NSUInteger i;
+
+    for (i = 0; i < maskRunCount; i++) {
+        if ((NSInteger)OSIROIMaskRunLastWidthIndex(maskRuns[i]) >= -x &&
+            (NSInteger)maskRuns[i].heightIndex >= -y &&
+            (NSInteger)maskRuns[i].depthIndex >= -z) {
+
+            newMaskRuns[newMaskRunsIndex] = maskRuns[i];
+
+            if ((NSInteger)OSIROIMaskRunFirstWidthIndex(newMaskRuns[newMaskRunsIndex]) < -x) {
+                newMaskRuns[newMaskRunsIndex].widthRange.length += x + (NSInteger)OSIROIMaskRunFirstWidthIndex(newMaskRuns[newMaskRunsIndex]);
+                newMaskRuns[newMaskRunsIndex].widthRange.location = 0;
+            } else {
+                newMaskRuns[newMaskRunsIndex].widthRange.location += x;
+            }
+
+            newMaskRuns[newMaskRunsIndex].heightIndex += y;
+            newMaskRuns[newMaskRunsIndex].depthIndex += z;
+
+            newMaskRunsIndex++;
+        }
     }
-    
-    return [[[[self class] alloc] initWithSortedMaskRuns:newMaskRuns] autorelease];
+
+    return [[[OSIROIMask alloc] initWithSortedMaskRunData:[NSData dataWithBytesNoCopy:newMaskRuns length:newMaskRunsIndex * sizeof(OSIROIMaskRun) freeWhenDone:YES]] autorelease];
 }
 
 - (OSIROIMask *)ROIMaskByIntersectingWithMask:(OSIROIMask *)otherMask
@@ -475,6 +601,46 @@ NSArray *OSIROIMaskIndexesInRun(OSIROIMaskRun maskRun)
     return [[[OSIROIMask alloc] initWithSortedMaskRunData:resultMaskRuns] autorelease];
 }
 
+- (OSIFloatVolumeData *)floatVolumeDataRepresentationWithVolumeTransform:(N3AffineTransform)volumeTransform;
+{
+    NSUInteger maxHeight = NSIntegerMin;
+    NSUInteger minHeight = NSIntegerMax;
+    NSUInteger maxDepth = NSIntegerMin;
+    NSUInteger minDepth = NSIntegerMax;
+    NSUInteger maxWidth = NSIntegerMin;
+    NSUInteger minWidth = NSIntegerMax;
+
+    [self extentMinWidth:&minWidth maxWidth:&maxWidth minHeight:&minHeight maxHeight:&maxHeight minDepth:&minDepth maxDepth:&maxDepth];
+
+    NSUInteger width = (maxWidth - minWidth) + 1;
+    NSUInteger height = (maxHeight - minHeight) + 1;
+    NSUInteger depth = (maxDepth - minDepth) + 1;
+
+    float *floatBytes = calloc(width * height * depth, sizeof(float));
+    if (floatBytes == 0) {
+        NSLog(@"%s wasn't able to allocate a buffer of size %ld", __PRETTY_FUNCTION__, width * height * depth * sizeof(float));
+        return nil;
+    }
+
+    OSIROIMaskRun *maskRuns = (OSIROIMaskRun *)[[self maskRunsData] bytes];
+    NSInteger maskRunCount = [self maskRunCount];
+    NSInteger i;
+
+    // draw in the runs
+    for (i = 0; i < maskRunCount; i++) {
+        NSInteger x = maskRuns[i].widthRange.location - minWidth;
+        NSInteger y = maskRuns[i].heightIndex - minHeight;
+        NSInteger z = maskRuns[i].depthIndex - minDepth;
+
+        vDSP_vfill(&(maskRuns[i].intensity), &(floatBytes[x + y*width + z*width*height]), 1, maskRuns[i].widthRange.length);
+    }
+    NSData *floatData = [NSData dataWithBytesNoCopy:floatBytes length:width * height * depth * sizeof(float)];
+
+    // since we shifted the data, we need to shift the volumeTransform as well.
+    N3AffineTransform shiftedVolumeTransform = N3AffineTransformConcat(volumeTransform, N3AffineTransformMakeTranslation(-1.0*(CGFloat)minWidth, -1.0*(CGFloat)minHeight, -1.0*(CGFloat)minDepth));
+
+    return [[[OSIFloatVolumeData alloc] initWithData:floatData pixelsWide:width pixelsHigh:height pixelsDeep:depth volumeTransform:shiftedVolumeTransform outOfBoundsValue:0] autorelease];
+}
 
 - (OSIROIMask *)ROIMaskBySubtractingMask:(OSIROIMask *)subtractMask
 {
@@ -553,7 +719,55 @@ NSArray *OSIROIMaskIndexesInRun(OSIROIMaskRun maskRun)
         [templateRunStack popMaskRun];
     }
 
+    [templateRunStack release];
     return [[[OSIROIMask alloc] initWithSortedMaskRunData:resultMaskRuns] autorelease];
+}
+
+- (OSIROIMask *)ROIMaskCroppedToWidth:(NSUInteger)width height:(NSUInteger)height depth:(NSUInteger)depth
+{
+    const OSIROIMaskRun *maskRuns = (const OSIROIMaskRun *)[[self maskRunsData] bytes];
+    NSInteger maskRunCount = [self maskRunCount];
+    NSInteger i;
+    NSUInteger badRuns = 0; // runs that are totally outside the bounds
+    NSUInteger clippedRuns = 0; // runs that are partially outside the bounds and will need to be clipped
+
+    for (i = 0; i < maskRunCount; i++) {
+        if (OSIROIMaskRunFirstWidthIndex(maskRuns[i]) >= width || maskRuns[i].heightIndex >= height || maskRuns[i].depthIndex >= depth) {
+            badRuns++;
+        } else if (OSIROIMaskRunLastWidthIndex(maskRuns[i]) >= width) {
+            clippedRuns++;
+        }
+    }
+
+    if (badRuns + clippedRuns == 0) {
+        return self;
+    }
+
+    NSUInteger newMaskRunsCount = maskRunCount - badRuns;
+
+    if (newMaskRunsCount == 0) {
+        return [OSIROIMask ROIMask];
+    }
+
+    OSIROIMaskRun *newMaskRuns = malloc(newMaskRunsCount * sizeof(OSIROIMaskRun));
+    memset(newMaskRuns, 0, newMaskRunsCount * sizeof(OSIROIMaskRun));
+    NSUInteger newMaskRunsIndex = 0;
+
+    for (i = 0; i < maskRunCount; i++) {
+        if (OSIROIMaskRunFirstWidthIndex(maskRuns[i]) < width &&
+            maskRuns[i].heightIndex < height &&
+            maskRuns[i].depthIndex < depth) {
+
+            newMaskRuns[newMaskRunsIndex] = maskRuns[i];
+
+            if (OSIROIMaskRunLastWidthIndex(maskRuns[i]) >= width) {
+                newMaskRuns[newMaskRunsIndex].widthRange.length = (width - newMaskRuns[newMaskRunsIndex].widthRange.location);
+            }
+            newMaskRunsIndex++;
+        }
+    }
+
+    return [[[OSIROIMask alloc] initWithSortedMaskRunData:[NSData dataWithBytesNoCopy:newMaskRuns length:newMaskRunsCount * sizeof(OSIROIMaskRun) freeWhenDone:YES]] autorelease];
 }
 
 - (BOOL)intersectsMask:(OSIROIMask *)otherMask // probably could use a faster implementation...
@@ -661,7 +875,11 @@ NSArray *OSIROIMaskIndexesInRun(OSIROIMaskRun maskRun)
 
 - (NSUInteger)maskRunCount
 {
-    return [[self maskRuns] count];
+    if (_maskRuns) {
+        return [_maskRuns count];
+    } else {
+        return [_maskRunsData length] / sizeof(OSIROIMaskRun);
+    }
 }
 
 - (NSUInteger)maskIndexCount
@@ -699,6 +917,11 @@ NSArray *OSIROIMaskIndexesInRun(OSIROIMaskRun maskRun)
 
 - (BOOL)indexInMask:(OSIROIMaskIndex)index
 {
+    return [self containsIndex:index];
+}
+
+- (BOOL)containsIndex:(OSIROIMaskIndex)index;
+{
     // since the runs are sorted, we can binary search
     NSUInteger runIndex = 0;
     NSUInteger runCount = 0;
@@ -733,30 +956,122 @@ NSArray *OSIROIMaskIndexesInRun(OSIROIMaskRun maskRun)
     return NO;
 }
 
+- (instancetype)ROIMaskByResamplingFromVolumeTransform:(N3AffineTransform)fromTransform toVolumeTransform:(N3AffineTransform)toTransform interpolationMode:(CPRInterpolationMode)interpolationsMode
+{
+    if (N3AffineTransformEqualToTransform(fromTransform, toTransform)) {
+        return self;
+    }
+
+    if ([self maskRunCount] == 0) {
+        return self;
+    }
+
+    // The implementation of this function can be made a lot less memory demanding my only sampling one slice at a time instead of the whole volume
+    OSIROIMask *resampledMask = nil;
+    N3AffineTransform toVolumeTransform = N3AffineTransformIdentity;
+    N3Vector shift = N3VectorZero;
+    @autoreleasepool {
+        OSIFloatVolumeData *fromVolumeData = [self floatVolumeDataRepresentationWithVolumeTransform:fromTransform];
+        OSIFloatVolumeData *toVolumeData = [fromVolumeData volumeDataResampledWithVolumeTransform:toTransform interpolationMode:interpolationsMode];
+        resampledMask = [OSIROIMask ROIMaskFromVolumeData:toVolumeData volumeTransform:&toVolumeTransform];
+
+        // volumeDataResampledWithVolumeTransform can shift the data so that it doesn't store more than it needs to, so figure out how much the shift was, and translate the mask so that is is at the right place
+        shift = N3VectorApplyTransform(N3VectorZero, N3AffineTransformConcat(N3AffineTransformInvert(toTransform), toVolumeTransform));
+
+#if CGFLOAT_IS_DOUBLE
+        shift.x = round(shift.x);
+        shift.y = round(shift.y);
+        shift.z = round(shift.z);
+#else
+        shift.x = roundf(shift.x);
+        shift.y = roundf(shift.y);
+        shift.z = roundf(shift.z);
+#endif
+
+        resampledMask = [[resampledMask ROIMaskByTranslatingByX:(NSInteger)-shift.x Y:(NSInteger)-shift.y Z:(NSInteger)-shift.z] retain];
+    }
+
+    return [resampledMask autorelease];
+}
+
+
+- (void)extentMinWidth:(NSUInteger*)minWidthPtr maxWidth:(NSUInteger*)maxWidthPtr minHeight:(NSUInteger*)minHeightPtr maxHeight:(NSUInteger*)maxHeightPtr minDepth:(NSUInteger*)minDepthPtr maxDepth:(NSUInteger*)maxDepthPtr;
+{
+    NSUInteger maxWidth = 0;
+    NSUInteger minWidth = NSUIntegerMax;
+    NSUInteger maxHeight = 0;
+    NSUInteger minHeight = NSUIntegerMax;
+    NSUInteger maxDepth = 0;
+    NSUInteger minDepth = NSUIntegerMax;
+
+    OSIROIMaskRun *maskRuns = (OSIROIMaskRun *)[[self maskRunsData] bytes];
+    NSInteger maskRunCount = [self maskRunCount];
+    NSInteger i;
+
+    if (maskRunCount == 0) {
+        if (minWidthPtr) {
+            *minWidthPtr = 0;
+        }
+        if (maxWidthPtr) {
+            *maxWidthPtr = 0;
+        }
+        if (minHeightPtr) {
+            *minHeightPtr = 0;
+        }
+        if (maxHeightPtr) {
+            *maxHeightPtr = 0;
+        }
+        if (minDepthPtr) {
+            *minDepthPtr = 0;
+        }
+        if (maxDepthPtr) {
+            *maxDepthPtr = 0;
+        }
+
+        return;
+    }
+
+    for (i = 0; i < maskRunCount; i++) {
+        maxWidth = MAX(maxWidth, (NSInteger)OSIROIMaskRunLastWidthIndex(maskRuns[i]));
+        minWidth = MIN(minWidth, (NSInteger)OSIROIMaskRunFirstWidthIndex(maskRuns[i]));
+
+        maxHeight = MAX(maxHeight, (NSInteger)maskRuns[i].heightIndex);
+        minHeight = MIN(minHeight, (NSInteger)maskRuns[i].heightIndex);
+
+        maxDepth = MAX(maxDepth, (NSInteger)maskRuns[i].depthIndex);
+        minDepth = MIN(minDepth, (NSInteger)maskRuns[i].depthIndex);
+    }
+
+    if (minWidthPtr) {
+        *minWidthPtr = minWidth;
+    }
+    if (maxWidthPtr) {
+        *maxWidthPtr = maxWidth;
+    }
+    if (minHeightPtr) {
+        *minHeightPtr = minHeight;
+    }
+    if (maxHeightPtr) {
+        *maxHeightPtr = maxHeight;
+    }
+    if (minDepthPtr) {
+        *minDepthPtr = minDepth;
+    }
+    if (maxDepthPtr) {
+        *maxDepthPtr = maxDepth;
+    }
+}
+
 - (NSArray *)convexHull
 {
-    NSValue *maskRunValue;
-    OSIROIMaskRun maskRun;
+    NSUInteger maxHeight = NSIntegerMin;
+    NSUInteger minHeight = NSIntegerMax;
+    NSUInteger maxDepth = NSIntegerMin;
+    NSUInteger minDepth = NSIntegerMax;
+    NSUInteger maxWidth = NSIntegerMin;
+    NSUInteger minWidth = NSIntegerMax;
 
-    NSInteger maxHeight = NSIntegerMin;
-    NSInteger minHeight = NSIntegerMax;
-    NSInteger maxDepth = NSIntegerMin;
-    NSInteger minDepth = NSIntegerMax;
-    NSInteger maxWidth = NSIntegerMin;
-    NSInteger minWidth = NSIntegerMax;
-    
-    for (maskRunValue in [self maskRuns]) {
-        maskRun = [maskRunValue OSIROIMaskRunValue];
-        
-        maxHeight = MAX(maxHeight, (NSInteger)maskRun.heightIndex + 1);
-        minHeight = MIN(minHeight, (NSInteger)maskRun.heightIndex - 1);
-        
-        maxDepth = MAX(maxDepth, maskRun.depthIndex + 1);
-        minDepth = MIN(minDepth, (NSInteger)maskRun.depthIndex - 1);
-        
-        maxWidth = MAX(maxWidth, (NSInteger)NSMaxRange(maskRun.widthRange) + 1);
-        minWidth = MIN(minWidth, (NSInteger)maskRun.widthRange.location - 1);
-	}
+    [self extentMinWidth:&minWidth maxWidth:&maxWidth minHeight:&minHeight maxHeight:&maxHeight minDepth:&minDepth maxDepth:&maxDepth];
 
     NSMutableArray *hull = [NSMutableArray arrayWithCapacity:8];
     [hull addObject:[NSValue valueWithN3Vector:N3VectorMake(minWidth, minDepth, minHeight)]];
@@ -792,6 +1107,40 @@ NSArray *OSIROIMaskIndexesInRun(OSIROIMaskRun maskRun)
     centerOfMass.z /= floatCount;
     
     return centerOfMass;
+}
+
+- (NSString *)description
+{
+    NSMutableString *desc = [NSMutableString string];
+	[desc appendString:NSStringFromClass([self class])];
+    [desc appendFormat:@"\nMask Run Count: %lld\n", (long long)[self maskRunCount]];
+    [desc appendFormat:@"Index Count: %lld\n", (long long)[self maskIndexCount]];
+
+    if ([self maskRunCount] > 0) {
+        NSUInteger minWidth = 0;
+        NSUInteger minHeight = 0;
+        NSUInteger minDepth = 0;
+        NSUInteger maxWidth = 0;
+        NSUInteger maxHeight = 0;
+        NSUInteger maxDepth = 0;
+        [self extentMinWidth:&minWidth maxWidth:&maxWidth minHeight:&minHeight maxHeight:&maxHeight minDepth:&minDepth maxDepth:&maxDepth];
+        [desc appendFormat:@"Width  Range: %4ld...%-4ld\n", (long )minWidth, (long)maxWidth];
+        [desc appendFormat:@"Height Range: %4ld...%-4ld\n", (long )minHeight, (long)maxHeight];
+        [desc appendFormat:@"Depth  Range: %4ld...%-4ld\n", (long )minDepth, (long)maxDepth];
+    }
+
+    [desc appendString:@"{\n"];
+
+    NSUInteger maskRunsCount = [self maskRunCount];
+    const OSIROIMaskRun *maskRuns = [[self maskRunsData] bytes];
+    NSUInteger i;
+
+    for (i = 0; i < maskRunsCount; i++) {
+        [desc appendFormat:@"X:%4ld...%-4ld Y:%-4ld Z:%-4ld\n", (long)OSIROIMaskRunFirstWidthIndex(maskRuns[i]), (long)OSIROIMaskRunLastWidthIndex(maskRuns[i]), (long)maskRuns[i].heightIndex, (long)maskRuns[i].depthIndex];
+    }
+
+    [desc appendString:@"}"];
+    return desc;
 }
 
 - (void)checkdebug
@@ -859,7 +1208,6 @@ NSArray *OSIROIMaskIndexesInRun(OSIROIMaskRun maskRun)
 }
 
 @end
-
 
 
 

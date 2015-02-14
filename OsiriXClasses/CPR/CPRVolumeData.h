@@ -83,6 +83,15 @@ typedef struct { // build one of these on the stack and then use -[CPRVolumeData
 - (CPRUnsignedInt16ImageRep *)unsignedInt16ImageRepForSliceAtIndex:(NSUInteger)z;
 - (CPRVolumeData *)volumeDataForSliceAtIndex:(NSUInteger)z;
 
+- (CPRVolumeData *)volumeDataByApplyingTransform:(N3AffineTransform)transform;
+
+// the first version of this function figures out the dimensions needed to fit the whole volume. Note that with the first version of this function the passed in transform may not
+// be equal to the volumeTransform of the returned volumeData because a minimum cube of data needed to fit the was calculated. Any shift in the data is guaranteed to be a multiple
+// of the basis vectors of the transform though.
+- (instancetype)volumeDataResampledWithVolumeTransform:(N3AffineTransform)transform interpolationMode:(CPRInterpolationMode)interpolationsMode;
+- (instancetype)volumeDataResampledWithVolumeTransform:(N3AffineTransform)transform pixelsWide:(NSUInteger)pixelsWide pixelsHigh:(NSUInteger)pixelsHigh pixelsDeep:(NSUInteger)pixelsDeep
+                                     interpolationMode:(CPRInterpolationMode)interpolationsMode;
+
 - (BOOL)getFloat:(float *)floatPtr atPixelCoordinateX:(NSUInteger)x y:(NSUInteger)y z:(NSUInteger)z; // returns YES if the float was sucessfully gotten
 - (BOOL)getLinearInterpolatedFloat:(float *)floatPtr atDicomVector:(N3Vector)vector; // these are slower, use the inline buffer if you care about speed
 - (BOOL)getNearestNeighborInterpolatedFloat:(float *)floatPtr atDicomVector:(N3Vector)vector; // these are slower, use the inline buffer if you care about speed
@@ -93,6 +102,8 @@ typedef struct { // build one of these on the stack and then use -[CPRVolumeData
 - (NSUInteger)tempBufferSizeForNumVectors:(NSUInteger)numVectors;
 - (void)linearInterpolateVolumeVectors:(N3VectorArray)volumeVectors outputValues:(float *)outputValues numVectors:(NSUInteger)numVectors tempBuffer:(void *)tempBuffer;
 // end not done
+
+- (BOOL)isEqual:(id)object;
 
 - (BOOL)isDataValid __deprecated;
 - (void)invalidateData __deprecated;

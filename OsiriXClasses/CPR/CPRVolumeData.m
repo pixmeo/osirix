@@ -224,6 +224,66 @@
     return YES;
 }
 
+- (instancetype)volumeDataByApplyingTransform:(N3AffineTransform)transform;
+{
+    return [[[CPRVolumeData alloc] initWithData:_floatData pixelsWide:_pixelsWide pixelsHigh:_pixelsHigh pixelsDeep:_pixelsDeep
+                                                                         volumeTransform:N3AffineTransformConcat(_volumeTransform, transform) outOfBoundsValue:_outOfBoundsValue] autorelease];
+}
+
+- (instancetype)volumeDataResampledWithVolumeTransform:(N3AffineTransform)transform interpolationMode:(CPRInterpolationMode)interpolationsMode
+{
+    if (N3AffineTransformEqualToTransform(_volumeTransform, transform)) {
+        return self;
+    }
+
+    N3AffineTransform oringinalVoxelToDicomTransform = N3AffineTransformInvert(_volumeTransform);
+    N3AffineTransform originalVoxelToNewVoxelTransform = N3AffineTransformConcat(oringinalVoxelToDicomTransform, transform);
+
+    N3Vector minCorner = N3VectorZero;
+    N3Vector maxCorner = N3VectorZero;
+
+    N3Vector corner1 = N3VectorApplyTransform(N3VectorMake(0,           0,           0), originalVoxelToNewVoxelTransform);
+    N3Vector corner2 = N3VectorApplyTransform(N3VectorMake(_pixelsWide, 0,           0), originalVoxelToNewVoxelTransform);
+    N3Vector corner3 = N3VectorApplyTransform(N3VectorMake(0,           _pixelsHigh, 0), originalVoxelToNewVoxelTransform);
+    N3Vector corner4 = N3VectorApplyTransform(N3VectorMake(_pixelsWide, _pixelsHigh, 0), originalVoxelToNewVoxelTransform);
+    N3Vector corner5 = N3VectorApplyTransform(N3VectorMake(0,           0,           _pixelsDeep), originalVoxelToNewVoxelTransform);
+    N3Vector corner6 = N3VectorApplyTransform(N3VectorMake(_pixelsWide, 0,           _pixelsDeep), originalVoxelToNewVoxelTransform);
+    N3Vector corner7 = N3VectorApplyTransform(N3VectorMake(0,           _pixelsHigh, _pixelsDeep), originalVoxelToNewVoxelTransform);
+    N3Vector corner8 = N3VectorApplyTransform(N3VectorMake(_pixelsWide, _pixelsHigh, _pixelsDeep), originalVoxelToNewVoxelTransform);
+
+    minCorner.x = MIN(MIN(MIN(MIN(MIN(MIN(MIN(corner1.x, corner2.x), corner3.x), corner4.x), corner5.x), corner6.x), corner7.x), corner8.x);
+    minCorner.y = MIN(MIN(MIN(MIN(MIN(MIN(MIN(corner1.y, corner2.y), corner3.y), corner4.y), corner5.y), corner6.y), corner7.y), corner8.y);
+    minCorner.z = MIN(MIN(MIN(MIN(MIN(MIN(MIN(corner1.z, corner2.z), corner3.z), corner4.z), corner5.z), corner6.z), corner7.z), corner8.z);
+    maxCorner.x = MAX(MAX(MAX(MAX(MAX(MAX(MAX(corner1.x, corner2.x), corner3.x), corner4.x), corner5.x), corner6.x), corner7.x), corner8.x);
+    maxCorner.y = MAX(MAX(MAX(MAX(MAX(MAX(MAX(corner1.y, corner2.y), corner3.y), corner4.y), corner5.y), corner6.y), corner7.y), corner8.y);
+    maxCorner.z = MAX(MAX(MAX(MAX(MAX(MAX(MAX(corner1.z, corner2.z), corner3.z), corner4.z), corner5.z), corner6.z), corner7.z), corner8.z);
+
+#if CGFLOAT_IS_DOUBLE
+    minCorner.x = floor(minCorner.x);
+    minCorner.y = floor(minCorner.y);
+    minCorner.z = floor(minCorner.z);
+    maxCorner.x = ceil(maxCorner.x);
+    maxCorner.y = ceil(maxCorner.y);
+    maxCorner.z = ceil(maxCorner.z);
+#else
+    minCorner.x = floorf(minCorner.x);
+    minCorner.y = floorf(minCorner.y);
+    minCorner.z = floorf(minCorner.z);
+    maxCorner.x = ceilf(maxCorner.x);
+    maxCorner.y = ceilf(maxCorner.y);
+    maxCorner.z = ceilf(maxCorner.z);
+#endif
+
+    NSUInteger width = (NSUInteger)(maxCorner.x - minCorner.x) + 1;
+    NSUInteger height = (NSUInteger)(maxCorner.y - minCorner.y) + 1;
+    NSUInteger depth = (NSUInteger)(maxCorner.z - minCorner.z) + 1;
+
+    N3AffineTransform shiftedTransform = N3AffineTransformConcat(transform, N3AffineTransformMakeTranslation(-1.0*(CGFloat)minCorner.x, -1.0*(CGFloat)minCorner.y, -1.0*(CGFloat)minCorner.z));
+
+    return [self volumeDataResampledWithVolumeTransform:shiftedTransform pixelsWide:width pixelsHigh:height pixelsDeep:depth interpolationMode:interpolationsMode];
+}
+
+
 - (instancetype)volumeDataResampledWithVolumeTransform:(N3AffineTransform)transform pixelsWide:(NSUInteger)pixelsWide pixelsHigh:(NSUInteger)pixelsHigh pixelsDeep:(NSUInteger)pixelsDeep
                                         interpolationMode:(CPRInterpolationMode)interpolationsMode;
 {
@@ -256,6 +316,30 @@
 - (NSUInteger)tempBufferSizeForNumVectors:(NSUInteger)numVectors
 {
     return numVectors * sizeof(float) * 11;
+}
+
+- (BOOL)isEqual:(id)object
+{
+    BOOL isEqual = NO;
+    if ([object isKindOfClass:[CPRVolumeData class]]) {
+        CPRVolumeDataInlineBuffer inlineBuffer1;
+        CPRVolumeDataInlineBuffer inlineBuffer2;
+        CPRVolumeData *otherVolumeData = (CPRVolumeData *)object;
+
+        [self aquireInlineBuffer:&inlineBuffer1];
+        [otherVolumeData aquireInlineBuffer:&inlineBuffer2];
+
+        if (inlineBuffer1.floatBytes == inlineBuffer2.floatBytes &&
+            inlineBuffer1.outOfBoundsValue == inlineBuffer2.outOfBoundsValue &&
+            inlineBuffer1.pixelsWide == inlineBuffer2.pixelsWide &&
+            inlineBuffer1.pixelsHigh == inlineBuffer2.pixelsHigh &&
+            inlineBuffer1.pixelsDeep == inlineBuffer2.pixelsDeep &&
+            N3AffineTransformEqualToTransform(inlineBuffer1.volumeTransform, inlineBuffer2.volumeTransform)) {
+            isEqual = YES;
+        }
+    }
+
+    return isEqual;
 }
 
 // not done yet, will crash if given vectors that are outside of the volume

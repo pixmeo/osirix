@@ -51,13 +51,16 @@
 - (BOOL)checkDebugROIMask:(OSIROIMask *)roiMask
 {
     NSValue *maskRunValue;
-    OSIROIMaskRun maskRun;
-    
-    for (maskRunValue in [roiMask maskRuns]) {
-        maskRun = [maskRunValue OSIROIMaskRunValue];
-        
-        if (maskRun.depthIndex >= _pixelsDeep || maskRun.heightIndex >= _pixelsHigh ||
-            maskRun.widthRange.location + maskRun.widthRange.length >= _pixelsWide) {
+    NSData *maskRunData;
+    OSIROIMaskRun *maskRuns;
+    NSInteger i;
+
+    maskRunData = [roiMask maskRunsData];
+    maskRuns = (OSIROIMaskRun *)[maskRunData bytes];
+
+    for (i = 0; i < [roiMask maskRunCount]; i++) {
+        if (maskRuns[i].depthIndex >= _pixelsDeep || maskRuns[i].heightIndex >= _pixelsHigh ||
+            maskRuns[i].widthRange.location + maskRuns[i].widthRange.length >= _pixelsWide) {
             return NO;
         }
     }
