@@ -175,48 +175,45 @@ NSArray *OSIROIMaskIndexesInRun(OSIROIMaskRun maskRun)
     maskRun = OSIROIMaskRunZero;
     maskRun.intensity = 0.0;
     
-    if ([floatVolumeData aquireInlineBuffer:&inlineBuffer]) {
-        for (k = 0; k < inlineBuffer.pixelsDeep; k++) {
-            for (j = 0; j < inlineBuffer.pixelsHigh; j++) {
-                for (i = 0; i < inlineBuffer.pixelsWide; i++) {
-                    intensity = CPRVolumeDataGetFloatAtPixelCoordinate(&inlineBuffer, i, j, k);
-                    intensity = roundf(intensity*255.0f)/255.0f;
+    [floatVolumeData aquireInlineBuffer:&inlineBuffer];
+    for (k = 0; k < inlineBuffer.pixelsDeep; k++) {
+        for (j = 0; j < inlineBuffer.pixelsHigh; j++) {
+            for (i = 0; i < inlineBuffer.pixelsWide; i++) {
+                intensity = CPRVolumeDataGetFloatAtPixelCoordinate(&inlineBuffer, i, j, k);
+                intensity = roundf(intensity*255.0f)/255.0f;
+                
+                if (intensity != maskRun.intensity) { // maybe start a run, maybe close a run
+                    if (maskRun.intensity != 0) { // we need to end the previous run
+                        [maskRuns addObject:[NSValue valueWithOSIROIMaskRun:maskRun]];
+                        maskRun = OSIROIMaskRunZero;
+                        maskRun.intensity = 0.0;
+                    }
                     
-                    if (intensity != maskRun.intensity) { // maybe start a run, maybe close a run
-                        if (maskRun.intensity != 0) { // we need to end the previous run
-                            [maskRuns addObject:[NSValue valueWithOSIROIMaskRun:maskRun]];
-                            maskRun = OSIROIMaskRunZero;
-                            maskRun.intensity = 0.0;
-                        }
-                        
-                        if (intensity != 0) { // we need to start a new mask run
-                            maskRun.depthIndex = k;
-                            maskRun.heightIndex = j;
-                            maskRun.widthRange = NSMakeRange(i, 1);
-                            maskRun.intensity = intensity;
-                        }
-                    } else  { // maybe extend a run // maybe do nothing
-                        if (intensity != 0) { // we need to extend the run
-                            maskRun.widthRange.length += 1;
-                        }
+                    if (intensity != 0) { // we need to start a new mask run
+                        maskRun.depthIndex = k;
+                        maskRun.heightIndex = j;
+                        maskRun.widthRange = NSMakeRange(i, 1);
+                        maskRun.intensity = intensity;
+                    }
+                } else  { // maybe extend a run // maybe do nothing
+                    if (intensity != 0) { // we need to extend the run
+                        maskRun.widthRange.length += 1;
                     }
                 }
-                // after each run scan line we need to close out any open mask run
-                if (maskRun.intensity != 0) {
-                    [maskRuns addObject:[NSValue valueWithOSIROIMaskRun:maskRun]];
-                    maskRun = OSIROIMaskRunZero;
-                    maskRun.intensity = 0.0;
-                }
+            }
+            // after each run scan line we need to close out any open mask run
+            if (maskRun.intensity != 0) {
+                [maskRuns addObject:[NSValue valueWithOSIROIMaskRun:maskRun]];
+                maskRun = OSIROIMaskRunZero;
+                maskRun.intensity = 0.0;
             }
         }
     }
-    
-    [floatVolumeData releaseInlineBuffer:&inlineBuffer];
-    
+
     return [[[[self class] alloc] initWithMaskRuns:maskRuns] autorelease];    
 }
 
-- (id)init
+- (instancetype)init
 {
 	if ( (self = [super init]) ) {
 		_maskRuns = [[NSArray alloc] init];

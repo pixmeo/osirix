@@ -111,24 +111,19 @@
     vectorTransform.m41 = vectorTransform.m42 = vectorTransform.m43 = 0.0;
     N3VectorApplyTransformToVectors(vectorTransform, volumeNormals, _width);
     
-    if ([_volumeData aquireInlineBuffer:&inlineBuffer]) {
-		for (y = 0; y < _height; y++) {
-			if ([self isCancelled]) {
-				break;
-			}
-			
-			for (x = 0; x < _width; x++) {
-				_floatBytes[y*_width + x] = CPRVolumeDataLinearInterpolatedFloatAtVolumeVector(&inlineBuffer, volumeVectors[x]);
-			}
-			
-			N3VectorAddVectors(volumeVectors, volumeNormals, _width);
-		}
-	} else {
-        memset(_floatBytes, 0, _height * _width * sizeof(float));
+    [_volumeData aquireInlineBuffer:&inlineBuffer];
+    for (y = 0; y < _height; y++) {
+        if ([self isCancelled]) {
+            break;
+        }
+        
+        for (x = 0; x < _width; x++) {
+            _floatBytes[y*_width + x] = CPRVolumeDataLinearInterpolatedFloatAtVolumeVector(&inlineBuffer, volumeVectors[x]);
+        }
+        
+        N3VectorAddVectors(volumeVectors, volumeNormals, _width);
     }
 
-    [_volumeData releaseInlineBuffer:&inlineBuffer];
-    
     free(volumeVectors);
     free(volumeNormals);
 }
@@ -152,24 +147,19 @@
     vectorTransform.m41 = vectorTransform.m42 = vectorTransform.m43 = 0.0;
     N3VectorApplyTransformToVectors(vectorTransform, volumeNormals, _width);
     
-    if ([_volumeData aquireInlineBuffer:&inlineBuffer]) {
-		for (y = 0; y < _height; y++) {
-			if ([self isCancelled]) {
-				break;
-			}
-			
-			for (x = 0; x < _width; x++) {
-				_floatBytes[y*_width + x] = CPRVolumeDataNearestNeighborInterpolatedFloatAtVolumeVector(&inlineBuffer, volumeVectors[x]);
-			}
-			
-			N3VectorAddVectors(volumeVectors, volumeNormals, _width);
-		}
-	} else {
-        memset(_floatBytes, 0, _height * _width * sizeof(float));
+    [_volumeData aquireInlineBuffer:&inlineBuffer];
+    for (y = 0; y < _height; y++) {
+        if ([self isCancelled]) {
+            break;
+        }
+        
+        for (x = 0; x < _width; x++) {
+            _floatBytes[y*_width + x] = CPRVolumeDataNearestNeighborInterpolatedFloatAtVolumeVector(&inlineBuffer, volumeVectors[x]);
+        }
+        
+        N3VectorAddVectors(volumeVectors, volumeNormals, _width);
     }
-    
-    [_volumeData releaseInlineBuffer:&inlineBuffer];
-    
+
     free(volumeVectors);
     free(volumeNormals);
 }

@@ -604,22 +604,13 @@ extern int splitPosition[ 3];
     
     for( int i = 0; i < self.generatedVolumeData.pixelsDeep; i++)
 	{
-		if ([self.generatedVolumeData aquireInlineBuffer:&inlineBuffer])
-		{
-			newPix = [[DCMPix alloc] initWithData:(float *)CPRVolumeDataFloatBytes(&inlineBuffer) + (i*self.generatedVolumeData.pixelsWide*self.generatedVolumeData.pixelsHigh) :32 
-												 :self.generatedVolumeData.pixelsWide :self.generatedVolumeData.pixelsHigh :self.generatedVolumeData.pixelSpacingX :self.generatedVolumeData.pixelSpacingY
-												 : -self.generatedVolumeData.pixelSpacingX*self.generatedVolumeData.pixelsWide/2.
-												 : -self.generatedVolumeData.pixelSpacingY*self.generatedVolumeData.pixelsHigh/2.
-												 : 0
-												 :NO];
-		}
-		else
-		{
-			assert(0);
-			newPix = [[DCMPix alloc] init];
-		}
-
-		[self.generatedVolumeData releaseInlineBuffer:&inlineBuffer];
+		[self.generatedVolumeData aquireInlineBuffer:&inlineBuffer];
+        newPix = [[DCMPix alloc] initWithData:(float *)CPRVolumeDataFloatBytes(&inlineBuffer) + (i*self.generatedVolumeData.pixelsWide*self.generatedVolumeData.pixelsHigh) :32
+                                             :self.generatedVolumeData.pixelsWide :self.generatedVolumeData.pixelsHigh :self.generatedVolumeData.pixelSpacingX :self.generatedVolumeData.pixelSpacingY
+                                             : -self.generatedVolumeData.pixelSpacingX*self.generatedVolumeData.pixelsWide/2.
+                                             : -self.generatedVolumeData.pixelSpacingY*self.generatedVolumeData.pixelsHigh/2.
+                                             : 0
+                                             :NO];
 
 		float orientation[ 6];
         [self.generatedVolumeData getOrientation:orientation];
