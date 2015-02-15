@@ -29,7 +29,7 @@
 
 @implementation OSIPlanarPathROI (Private)
 
-- (id)initWithOsiriXROI:(ROI *)roi pixToDICOMTransfrom:(N3AffineTransform)pixToDICOMTransfrom homeFloatVolumeData:(OSIFloatVolumeData *)floatVolumeData
+- (id)initWithOsiriXROI:(ROI *)roi pixToDICOMTransfrom:(N3AffineTransform)pixToDICOMTransfrom
 {
 	NSPoint point;
 	NSArray *pointArray;
@@ -42,8 +42,7 @@
 		_osiriXROI = [roi retain];
 		        
 		_plane = N3PlaneApplyTransform(N3PlaneZZero, pixToDICOMTransfrom);
-        [self setHomeFloatVolumeData:floatVolumeData];
-		
+
 		if ([roi type] == tMesure && [[roi points] count] > 1) {
 			_bezierPath = [[N3MutableBezierPath alloc] init];
 			point = [roi pointAtIndex:0];
@@ -289,7 +288,7 @@
 	return [NSSet setWithObject:_osiriXROI];
 }
 
-- (void)drawSlab:(OSISlab)slab inCGLContext:(CGLContextObj)cgl_ctx pixelFormat:(CGLPixelFormatObj)pixelFormat dicomToPixTransform:(N3AffineTransform)dicomToPixTransform
+- (void)drawRect:(NSRect)rect inSlab:(OSISlab)slab inCGLContext:(CGLContextObj)cgl_ctx pixelFormat:(CGLPixelFormatObj)pixelFormat dicomToPixTransform:(N3AffineTransform)dicomToPixTransform;
 {
 	double dicomToPixGLTransform[16];
 	NSInteger i;
@@ -327,8 +326,13 @@
     N3Vector lineStart;
     N3Vector lineEnd;
     
-    inverseVolumeTransform = N3AffineTransformInvert([[self homeFloatVolumeData] volumeTransform]);
-    mask = [self ROIMaskForFloatVolumeData:[self homeFloatVolumeData]];
+    N3AffineTransform dicomToFloatDataTransform = N3AffineTransformConcat(dicomToPixTransform, N3AffineTransformMakeTranslation(-rect.origin.x, -rect.origin.y, 0));
+    NSData *floatData = [NSData dataWithBytes:NULL length:rect.size.width * rect.size.height];
+    OSIFloatVolumeData *volumeData = [[OSIFloatVolumeData alloc] initWithData:floatData pixelsWide:rect.size.width pixelsHigh:rect.size.height pixelsDeep:1
+                                                              volumeTransform:dicomToFloatDataTransform outOfBoundsValue:0];
+
+    inverseVolumeTransform = N3AffineTransformInvert([volumeData volumeTransform]);
+    mask = [self ROIMaskForFloatVolumeData:volumeData];
     maskRuns = [mask maskRuns];
 
     glColor3f(1, 0, 1);
