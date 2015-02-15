@@ -19,7 +19,8 @@
 
 @interface OSICoalescedPlanarROI : OSIROI {
     NSArray *_sourceROIs;
-    
+    N3AffineTransform _volumeTransform;
+
     OSIFloatVolumeData *_coalescedROIMaskVolumeData;
     
     OSISlab _cachedSlab;
@@ -28,8 +29,9 @@
     NSData *_cachedMaskRunsData;
 }
 
-- (id)initWithSourceROIs:(NSArray *)rois homeFloatVolumeData:(OSIFloatVolumeData *)floatVolumeData;
+- (id)initWithSourceROIs:(NSArray *)rois;
 
 @property (readonly, copy) NSArray *sourceROIs;
+@property (readonly, assign) N3AffineTransform volumeTransform;
 
 @end
