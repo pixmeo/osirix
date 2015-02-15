@@ -23,7 +23,7 @@
 
 @implementation OSIPlanarBrushROI (Private)
 
-- (id)initWithOsiriXROI:(ROI *)roi pixToDICOMTransfrom:(N3AffineTransform)pixToDICOMTransfrom homeFloatVolumeData:(OSIFloatVolumeData *)floatVolumeData
+- (id)initWithOsiriXROI:(ROI *)roi pixToDICOMTransfrom:(N3AffineTransform)pixToDICOMTransfrom
 {
 	NSMutableArray *hullPoints;
     NSInteger i;
@@ -35,8 +35,7 @@
 		_osiriXROI = [roi retain];
 		
 		_plane = N3PlaneApplyTransform(N3PlaneZZero, pixToDICOMTransfrom);
-        [self setHomeFloatVolumeData:floatVolumeData];
-		
+
 		if ([roi type] == tPlain) {
             hullPoints = [[NSMutableArray alloc] init];
             
@@ -113,7 +112,7 @@
     request.interpolationMode = CPRInterpolationModeNearestNeighbor;
     
     volume = [CPRGenerator synchronousRequestVolume:request volumeData:_brushMask];    
-    roiMask = [OSIROIMask ROIMaskFromVolumeData:(OSIFloatVolumeData *)volume];
+    roiMask = [OSIROIMask ROIMaskFromVolumeData:(OSIFloatVolumeData *)volume volumeTransform:NULL];
     
 #if CGFLOAT_IS_DOUBLE
     return [roiMask ROIMaskByTranslatingByX:0 Y:0 Z:round(planePixelPoint.z)];
@@ -123,7 +122,7 @@
 
 }
 
-- (void)drawSlab:(OSISlab)slab inCGLContext:(CGLContextObj)cgl_ctx pixelFormat:(CGLPixelFormatObj)pixelFormat dicomToPixTransform:(N3AffineTransform)dicomToPixTransform
+- (void)drawRect:(NSRect)rect inSlab:(OSISlab)slab inCGLContext:(CGLContextObj)cgl_ctx pixelFormat:(CGLPixelFormatObj)pixelFormat dicomToPixTransform:(N3AffineTransform)dicomToPixTransform;
 {
 	double dicomToPixGLTransform[16];
 	
@@ -148,9 +147,26 @@
     N3AffineTransform inverseVolumeTransform;
     N3Vector lineStart;
     N3Vector lineEnd;
+
+    // dicom to pix transform gives us the actual pixel spacing to use
+    // it might be interesting to make a float volume data that only initializes its memory
+    // when it is really needed, that might allow a function like this to
+    // but for now make a float volume data that is the size of what is being visualized.
+
+    // rect will give the width and height, but we will use slab to find the depth
+    // to slab gives us the height in cm, and the dicomToPixTransform will give us the pixelspacing
+
+    // all this, but for now, ignore the thickness
+//    N3AffineTransform pixToDicomTransform = N3AffineTransformInvert(dicomToPixTransform);
+//    CGFloat cmPerPix = N3VectorLength(N3VectorApplyTransform(N3VectorZBasis, pixToDicomTransform));
+//    CGFloat slabThicknessPix = ceil(slab.thickness / cmPerPix);
+    N3AffineTransform dicomToFloatDataTransform = N3AffineTransformConcat(dicomToPixTransform, N3AffineTransformMakeTranslation(-rect.origin.x, -rect.origin.y, 0));
+    NSData *floatData = [NSData dataWithBytes:NULL length:rect.size.width * rect.size.height];
+    OSIFloatVolumeData *volumeData = [[OSIFloatVolumeData alloc] initWithData:floatData pixelsWide:rect.size.width pixelsHigh:rect.size.height pixelsDeep:1
+                                                              volumeTransform:dicomToFloatDataTransform outOfBoundsValue:0];
     
-    inverseVolumeTransform = N3AffineTransformInvert([[self homeFloatVolumeData] volumeTransform]);
-    mask = [self ROIMaskForFloatVolumeData:[self homeFloatVolumeData]];
+    inverseVolumeTransform = N3AffineTransformInvert([volumeData volumeTransform]);
+    mask = [self ROIMaskForFloatVolumeData:volumeData];
     maskRuns = [mask maskRuns];
     
     glColor3f(1, 0, 1);

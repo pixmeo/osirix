@@ -14,6 +14,7 @@
 
 #import <Cocoa/Cocoa.h>
 #import "N3Geometry.h"
+#import "OSIFloatVolumeData.h"
 
 @class OSIFloatVolumeData;
 
@@ -31,6 +32,21 @@ typedef struct OSIROIMaskRun OSIROIMaskRun;
 
 extern const OSIROIMaskRun OSIROIMaskRunZero;
 
+/** Returns a newly created OSIROIMaskRun
+ 
+ */
+OSIROIMaskRun OSIROIMaskRunMake(NSRange widthRange, NSUInteger heightIndex, NSUInteger depthIndex, float intensity);
+
+/** Returns the first width index that is under the run.
+
+ */
+NSUInteger OSIROIMaskRunFirstWidthIndex(OSIROIMaskRun maskRun);
+
+/** Returns the last width index that is under the run.
+
+ */
+NSUInteger OSIROIMaskRunLastWidthIndex(OSIROIMaskRun maskRun);
+
 /** A structure used to describe a single point in a mask.
  
  */
@@ -43,6 +59,11 @@ struct OSIROIMaskIndex {
 typedef struct OSIROIMaskIndex OSIROIMaskIndex;
 
 CF_EXTERN_C_BEGIN
+
+/** Transforms the maskIndex using the given transform, and returns an N3Vector
+ 
+ */
+N3Vector OSIROIMaskIndexApplyTransform(OSIROIMaskIndex maskIndex, N3AffineTransform transform);
 
 /** Returns YES if the `maskIndex` is withing the `maskRun`
  
@@ -92,7 +113,7 @@ CF_EXTERN_C_END
  
  `NSUInteger heightIndex;`
  
- `NSUInteger depthIndex;`
+ `float intensity;`
  
  `};`
  
@@ -122,7 +143,7 @@ CF_EXTERN_C_END
  */
 
 
-@interface OSIROIMask : NSObject <NSCopying> {
+@interface OSIROIMask : NSObject <NSCopying, NSSecureCoding> {
 @private
     NSData *_maskRunsData;
 	NSArray *_maskRuns;
@@ -136,7 +157,31 @@ CF_EXTERN_C_END
  
  @return The newly crated and initialized ROI Mask object.
  */
-+ (id)ROIMask;
++ (instancetype)ROIMask;
+
+/** Returns a newly created ROI Mask that has the shape of a sphere with the specified diameter.
+ 
+ @return The newly crated and initialized ROI Mask object.
+ */
++ (instancetype)ROIMaskWithSphereDiameter:(NSUInteger)diameter;
+
+/** Returns a newly created ROI Mask that has the shape of a cube with the specified size.
+ 
+ @return The newly crated and initialized ROI Mask object.
+ */
++ (instancetype)ROIMaskWithCubeSize:(NSUInteger)size;
+
+/** Returns a newly created ROI Mask that has the shape of a box with the specified sizes.
+
+ @return The newly crated and initialized ROI Mask object.
+ */
++ (instancetype)ROIMaskWithBoxWidth:(NSUInteger)width height:(NSUInteger)height depth:(NSUInteger)depth;
+
+/** Returns a newly created ROI Mask that has the shape of an elipsoid with the specified sizes.
+
+ @return The newly crated and initialized ROI Mask object.
+ */
++ (instancetype)ROIMaskWithElipsoidWidth:(NSUInteger)width height:(NSUInteger)height depth:(NSUInteger)depth;
 
 /** Returns a newly created ROI Mask based on the intesities of the floatVolumeData.
  
@@ -144,8 +189,10 @@ CF_EXTERN_C_END
  
  @return The newly crated and initialized ROI Mask object or `nil` if there was a problem initializing the object.
  @param floatVolumeData The OSIFloatVolumeData on which to build and base the mask.
+ @param volumeTransformPtr Returns the transform needed to go from DICOM space to the mask
  */
-+ (id)ROIMaskFromVolumeData:(OSIFloatVolumeData *)floatVolumeData;
++ (instancetype)ROIMaskFromVolumeData:(OSIFloatVolumeData *)floatVolumeData volumeTransform:(N3AffineTransformPointer)volumeTransformPtr;
++ (instancetype)ROIMaskFromVolumeData:(OSIFloatVolumeData *)floatVolumeData __deprecated;
 
 /** Initializes and returns a newly created empty ROI Mask.
  
@@ -153,7 +200,7 @@ CF_EXTERN_C_END
  
  @return The initialized ROI Mask object.
  */
-- (id)init;
+- (instancetype)init;
 
 // create the thing, maybe we should really be working with C arrays.... or at least give the option
 /** Initializes and returns a newly created ROI Mask.
@@ -163,7 +210,7 @@ CF_EXTERN_C_END
  @return The initialized ROI Mask object or `nil` if there was a problem initializing the object.
  @param maskRuns An array of OSIROIMaskRun structs in NSValues.
  */
-- (id)initWithMaskRuns:(NSArray *)maskRuns;
+- (instancetype)initWithMaskRuns:(NSArray *)maskRuns;
 
 /** Initializes and returns a newly created ROI Mask.
  
@@ -172,7 +219,7 @@ CF_EXTERN_C_END
  @return The initialized ROI Mask object or `nil` if there was a problem initializing the object.
  @param maskRunData is the serialized OSIROIMaskRuns.
  */
-- (id)initWithMaskRunData:(NSData *)maskRunData;
+- (instancetype)initWithMaskRunData:(NSData *)maskRunData;
 
 /** Initializes and returns a newly created ROI Mask.
  
@@ -181,7 +228,7 @@ CF_EXTERN_C_END
  @return The initialized ROI Mask object or `nil` if there was a problem initializing the object.
  @param maskRunData is the serialized OSIROIMaskRuns.
  */
-- (id)initWithSortedMaskRunData:(NSData *)maskRunData;
+- (instancetype)initWithSortedMaskRunData:(NSData *)maskRunData;
 
 // create the thing, maybe we should really be working with C arrays.... or at least give the option
 /** Initializes and returns a newly created ROI Mask.
@@ -191,7 +238,7 @@ CF_EXTERN_C_END
  @return The initialized ROI Mask object or `nil` if there was a problem initializing the object.
  @param maskRuns An array of OSIROIMaskRun structs in NSValues.
  */
-- (id)initWithSortedMaskRuns:(NSArray *)maskRuns;
+- (instancetype)initWithSortedMaskRuns:(NSArray *)maskRuns;
 
 /** Initializes and returns a newly created ROI Mask.
  
@@ -200,7 +247,7 @@ CF_EXTERN_C_END
  @return The initialized ROI Mask object or `nil` if there was a problem initializing the object.
  @param maskRuns An array of OSIROIMaskIndex structs in NSValues.
  */
-- (id)initWithIndexes:(NSArray *)maskIndexes;
+- (instancetype)initWithIndexes:(NSArray *)maskIndexes;
 
 /** Initializes and returns a newly created ROI Mask.
  
@@ -209,7 +256,7 @@ CF_EXTERN_C_END
  @return The initialized ROI Mask object or `nil` if there was a problem initializing the object.
  @param indexData is the serialized OSIROIMaskIndexes.
  */
-- (id)initWithIndexData:(NSData *)indexData;
+- (instancetype)initWithIndexData:(NSData *)indexData;
 
 /** Initializes and returns a newly created ROI Mask.
  
@@ -218,7 +265,7 @@ CF_EXTERN_C_END
  @return The initialized ROI Mask object or `nil` if there was a problem initializing the object.
  @param maskRuns An array of OSIROIMaskIndex structs in NSValues.
  */
-- (id)initWithSortedIndexes:(NSArray *)maskIndexes;
+- (instancetype)initWithSortedIndexes:(NSArray *)maskIndexes;
 
 /** Initializes and returns a newly created ROI Mask.
  
@@ -227,7 +274,7 @@ CF_EXTERN_C_END
  @return The initialized ROI Mask object or `nil` if there was a problem initializing the object.
  @param maskRuns An array of OSIROIMaskIndex structs in NSValues.
  */
-- (id)initWithSortedIndexData:(NSData *)indexData;
+- (instancetype)initWithSortedIndexData:(NSData *)indexData;
 
 ///-----------------------------------
 /// @name Working with the Mask
@@ -249,9 +296,19 @@ CF_EXTERN_C_END
 - (OSIROIMask *)ROIMaskByUnioningWithMask:(OSIROIMask *)otherMask;
 
 /** Returns a mask formed by subtracting otherMask from the receiver.
- 
+
  */
 - (OSIROIMask *)ROIMaskBySubtractingMask:(OSIROIMask *)otherMask;
+
+/** Returns a OSIFloatVolumeData filled with the intensities of the mask.
+
+ */
+- (OSIFloatVolumeData *)floatVolumeDataRepresentationWithVolumeTransform:(N3AffineTransform)volumeTransform;
+
+/** Returns a mask formed by cropping any indexes that are further out than the bounds specified from the receiver.
+ 
+ */
+- (OSIROIMask *)ROIMaskCroppedToWidth:(NSUInteger)width height:(NSUInteger)height depth:(NSUInteger)depth;
 
 /** Returns YES if the two masks intersect.
  
@@ -312,7 +369,18 @@ CF_EXTERN_C_END
  
  @param index OSIROIMaskIndex struct to test.
  */
-- (BOOL)indexInMask:(OSIROIMaskIndex)index;
+- (BOOL)containsIndex:(OSIROIMaskIndex)index;
+- (BOOL)indexInMask:(OSIROIMaskIndex)index __deprecated;
+
+/** Returns a mask that has been resampled from being in the volume as the position fromTransform to a mask that is in the volume at position toTransform.
+
+ */
+- (instancetype)ROIMaskByResamplingFromVolumeTransform:(N3AffineTransform)fromTransform toVolumeTransform:(N3AffineTransform)toTransform interpolationMode:(CPRInterpolationMode)interpolationsMode;
+
+/** Returns the extent of the receiver. All values are inclusive.
+
+ */
+- (void)extentMinWidth:(NSUInteger*)minWidthPtr maxWidth:(NSUInteger*)maxWidthPtr minHeight:(NSUInteger*)minHeightPtr maxHeight:(NSUInteger*)maxHeightPtr minDepth:(NSUInteger*)minDepthPtr maxDepth:(NSUInteger*)maxDepthPtr;
 
 /** Returns an array of points that represent the outside bounds of the mask.
  

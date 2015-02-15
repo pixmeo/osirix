@@ -19,15 +19,14 @@
 
 CF_EXTERN_C_BEGIN
 
-enum _CPRInterpolationMode {
-    CPRInterpolationModeLinear, // don't use this, it is not implemented
+typedef NS_ENUM(NSInteger, CPRInterpolationMode) {
+    CPRInterpolationModeLinear,
     CPRInterpolationModeNearestNeighbor,
 	
 	CPRInterpolationModeNone = 0xFFFFFF,
 };
-typedef NSInteger CPRInterpolationMode;
 
-typedef struct { // build one of these on the stack and then use -[CPRVolumeData aquireInlineBuffer:] to initialize it. Then make sure to release it too!
+typedef struct { // build one of these on the stack and then use -[CPRVolumeData aquireInlineBuffer:] to initialize it.
     const float *floatBytes;
     
     float outOfBoundsValue;
@@ -43,10 +42,7 @@ typedef struct { // build one of these on the stack and then use -[CPRVolumeData
 
 // Interface to the data
 @interface CPRVolumeData : NSObject {
-    volatile int32_t _readerCount __attribute__ ((aligned (4)));
-    volatile BOOL _isValid;
-
-    const float *_floatBytes;
+    NSData *_floatData;
     float _outOfBoundsValue;
     
     NSUInteger _pixelsWide;
@@ -54,15 +50,16 @@ typedef struct { // build one of these on the stack and then use -[CPRVolumeData
     NSUInteger _pixelsDeep;
     
     N3AffineTransform _volumeTransform; // volumeTransform is the transform from Dicom (patient) space to pixel data
-    
-    BOOL _freeWhenDone;
-    
-    NSMutableDictionary *_childSubvolumes; // volumeData objects that point to the same underlying data
 }
 
 
-- (id)initWithFloatBytesNoCopy:(const float *)floatBytes pixelsWide:(NSUInteger)pixelsWide pixelsHigh:(NSUInteger)pixelsHigh pixelsDeep:(NSUInteger)pixelsDeep
+- (instancetype)initWithFloatBytesNoCopy:(const float *)floatBytes pixelsWide:(NSUInteger)pixelsWide pixelsHigh:(NSUInteger)pixelsHigh pixelsDeep:(NSUInteger)pixelsDeep
                volumeTransform:(N3AffineTransform)volumeTransform outOfBoundsValue:(float)outOfBoundsValue freeWhenDone:(BOOL)freeWhenDone; // volumeTransform is the transform from Dicom (patient) space to pixel data
+
+- (instancetype)initWithData:(NSData *)data pixelsWide:(NSUInteger)pixelsWide pixelsHigh:(NSUInteger)pixelsHigh pixelsDeep:(NSUInteger)pixelsDeep
+   volumeTransform:(N3AffineTransform)volumeTransform outOfBoundsValue:(float)outOfBoundsValue; // volumeTransform is the transform from Dicom (patient) space to pixel data
+
+- (instancetype)initWithVolumeData:(CPRVolumeData *)volumeData;
 
 @property (readonly) NSUInteger pixelsWide;
 @property (readonly) NSUInteger pixelsHigh;
@@ -79,15 +76,6 @@ typedef struct { // build one of these on the stack and then use -[CPRVolumeData
 
 @property (readonly) N3AffineTransform volumeTransform; // volumeTransform is the transform from Dicom (patient) space to pixel data
 
-- (BOOL)isDataValid;
-- (void)invalidateData; // this is to be called right before freeing the data by objects who own the floatBytes that were given to the receiver
-						// this may lock temporarily if other threads are accessing the data, after this returns, it is ok to free floatBytes and all calls to access data will fail gracefully
-						// (except inlineBuffer based calls, check the return value of aquireInlineBuffer: to make sure it is ok to call the inline functions) 
-                        // if the data is not owned by the CPRVolumeData, make sure to call invalidateData before freeing the data, even before releasing,
-                        // in case other objects have retained the receiver
-
-//- (BOOL)getFloatData:(float *)buffer range:(NSRange)range; // returns YES if the data was sucessfully filled
-
 // will copy fill length*sizeof(float) bytes, the coordinates better be within the volume!!!
 // a run a is a series of pixels in the x direction
 - (BOOL)getFloatRun:(float *)buffer atPixelCoordinateX:(NSUInteger)x y:(NSUInteger)y z:(NSUInteger)z length:(NSUInteger)length; 
@@ -95,17 +83,31 @@ typedef struct { // build one of these on the stack and then use -[CPRVolumeData
 - (CPRUnsignedInt16ImageRep *)unsignedInt16ImageRepForSliceAtIndex:(NSUInteger)z;
 - (CPRVolumeData *)volumeDataForSliceAtIndex:(NSUInteger)z;
 
+- (CPRVolumeData *)volumeDataByApplyingTransform:(N3AffineTransform)transform;
+
+// the first version of this function figures out the dimensions needed to fit the whole volume. Note that with the first version of this function the passed in transform may not
+// be equal to the volumeTransform of the returned volumeData because a minimum cube of data needed to fit the was calculated. Any shift in the data is guaranteed to be a multiple
+// of the basis vectors of the transform though.
+- (instancetype)volumeDataResampledWithVolumeTransform:(N3AffineTransform)transform interpolationMode:(CPRInterpolationMode)interpolationsMode;
+- (instancetype)volumeDataResampledWithVolumeTransform:(N3AffineTransform)transform pixelsWide:(NSUInteger)pixelsWide pixelsHigh:(NSUInteger)pixelsHigh pixelsDeep:(NSUInteger)pixelsDeep
+                                     interpolationMode:(CPRInterpolationMode)interpolationsMode;
+
 - (BOOL)getFloat:(float *)floatPtr atPixelCoordinateX:(NSUInteger)x y:(NSUInteger)y z:(NSUInteger)z; // returns YES if the float was sucessfully gotten
 - (BOOL)getLinearInterpolatedFloat:(float *)floatPtr atDicomVector:(N3Vector)vector; // these are slower, use the inline buffer if you care about speed
 - (BOOL)getNearestNeighborInterpolatedFloat:(float *)floatPtr atDicomVector:(N3Vector)vector; // these are slower, use the inline buffer if you care about speed
 
-- (BOOL)aquireInlineBuffer:(CPRVolumeDataInlineBuffer *)inlineBuffer; // make sure to pair this with a releaseInlineBuffer (even if it returns NO!), returns YES if the data is valid. The data will be locked and remain valid until releaseInlineBuffer: is called
-- (void)releaseInlineBuffer:(CPRVolumeDataInlineBuffer *)inlineBuffer; 
+- (BOOL)aquireInlineBuffer:(CPRVolumeDataInlineBuffer *)inlineBuffer; // always return YES
 
 // not done yet, will crash if given vectors that are outside of the volume
 - (NSUInteger)tempBufferSizeForNumVectors:(NSUInteger)numVectors;
 - (void)linearInterpolateVolumeVectors:(N3VectorArray)volumeVectors outputValues:(float *)outputValues numVectors:(NSUInteger)numVectors tempBuffer:(void *)tempBuffer;
 // end not done
+
+- (BOOL)isEqual:(id)object;
+
+- (BOOL)isDataValid __deprecated;
+- (void)invalidateData __deprecated;
+- (void)releaseInlineBuffer:(CPRVolumeDataInlineBuffer *)inlineBuffer __deprecated; // CPRVolumeTransform can no longer be invalided so the this is no longer needed
 
 @end
 
@@ -242,10 +244,16 @@ v   =  t0 + (z)*(t1-t0);
 
 CF_INLINE float CPRVolumeDataNearestNeighborInterpolatedFloatAtVolumeCoordinate(CPRVolumeDataInlineBuffer *inlineBuffer, CGFloat x, CGFloat y, CGFloat z) // coordinate in the pixel space
 {
-    NSInteger roundX = (x + 0.5f);
-    NSInteger roundY = (y + 0.5f);
-    NSInteger roundZ = (z + 0.5f);
-        
+#if CGFLOAT_IS_DOUBLE
+    NSInteger roundX = round(x);
+    NSInteger roundY = round(y);
+    NSInteger roundZ = round(z);
+#else
+    NSInteger roundX = roundf(x);
+    NSInteger roundY = roundf(y);
+    NSInteger roundZ = roundf(z);
+#endif
+
     return CPRVolumeDataGetFloatAtPixelCoordinate(inlineBuffer, roundX, roundY, roundZ);
 }
 

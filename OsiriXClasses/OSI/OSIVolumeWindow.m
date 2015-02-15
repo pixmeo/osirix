@@ -133,8 +133,6 @@ NSString* const OSIVolumeWindowDidChangeDataNotification = @"OSIVolumeWindowDidC
     if (floatVolumeData) {
         if ([floatVolumeData isDataValid]) {
             return floatVolumeData;
-        } else {
-            [_generatedFloatVolumeDatas removeObjectForKey:dimensionAndIndexKey];
         }
     }
     
