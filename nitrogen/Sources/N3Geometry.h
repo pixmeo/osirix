@@ -70,6 +70,10 @@ typedef N3AffineTransform *N3AffineTransformArray;
 
 extern const N3Vector N3VectorZero;
 
+extern const N3Vector N3VectorXBasis;
+extern const N3Vector N3VectorYBasis;
+extern const N3Vector N3VectorZBasis;
+
 N3Vector N3VectorMake(CGFloat x, CGFloat y, CGFloat z);
 
 bool N3VectorEqualToVector(N3Vector vector1, N3Vector vector2);
@@ -93,6 +97,7 @@ CGFloat N3VectorLength(N3Vector vector);
 N3Vector N3VectorNormalize(N3Vector vector);
 N3Vector N3VectorProject(N3Vector vector1, N3Vector vector2); // project vector1 onto vector2
 
+N3Vector N3VectorRound(N3Vector vector);
 N3Vector N3VectorInvert(N3Vector vector);
 N3Vector N3VectorApplyTransform(N3Vector vector, N3AffineTransform transform);
 N3Vector N3VectorApplyTransformToDirectionalVector(N3Vector vector, N3AffineTransform transform); // this will not apply the translation to the vector, this is to be used when the vector does not coorespond to a point in space, but instead to a direction
@@ -137,6 +142,9 @@ void N3VectorNormalizeVectors(N3VectorArray vectors, CFIndex numVectors);
 CG_INLINE NSPoint NSPointFromN3Vector(N3Vector vector) {return NSMakePoint(vector.x, vector.y);}
 CG_INLINE N3Vector N3VectorMakeFromNSPoint(NSPoint point) {return N3VectorMake(point.x, point.y, 0);}
 
+NSPoint NSPointApplyN3AffineTransform(NSPoint point, N3AffineTransform transform);
+NSRect NSRectApplyN3AffineTransformBounds(NSRect rect, N3AffineTransform);
+
 extern const N3AffineTransform N3AffineTransformIdentity;
 
 bool N3AffineTransformIsRectilinear(N3AffineTransform t); // this is not the right term, but what is a transform that only includes scale and translation called?
@@ -159,10 +167,12 @@ CG_INLINE N3AffineTransform N3AffineTransformScale(N3AffineTransform t, CGFloat 
 CG_INLINE N3AffineTransform N3AffineTransformRotate(N3AffineTransform t, CGFloat angle, CGFloat x, CGFloat y, CGFloat z) {return CATransform3DRotate(t, angle, x, y, z);}
 CG_INLINE N3AffineTransform N3AffineTransformRotateAroundVector(N3AffineTransform t, CGFloat angle, N3Vector vector) {return CATransform3DRotate(t, angle, vector.x, vector.y, vector.z);}
 
+CFDictionaryRef N3AffineTransformCreateDictionaryRepresentation(N3AffineTransform transform);
 CFDictionaryRef N3VectorCreateDictionaryRepresentation(N3Vector vector);
 CFDictionaryRef N3LineCreateDictionaryRepresentation(N3Line line);
 CFDictionaryRef N3PlaneCreateDictionaryRepresentation(N3Plane plane);
 
+bool N3AffineTransformMakeWithDictionaryRepresentation(CFDictionaryRef dict, N3AffineTransform *transform);
 bool N3VectorMakeWithDictionaryRepresentation(CFDictionaryRef dict, N3Vector *vector);
 bool N3LineMakeWithDictionaryRepresentation(CFDictionaryRef dict, N3Line *line);
 bool N3PlaneMakeWithDictionaryRepresentation(CFDictionaryRef dict, N3Plane *plane);
@@ -209,6 +219,21 @@ NSString *NSStringFromN3Plane(N3Plane plane);
 
 @end
 
+/** NSCoder support. **/
+
+@interface NSCoder (N3GeometryAdditions)
+
+- (void)encodeN3AffineTransform:(N3AffineTransform)transform forKey:(NSString *)key;
+- (void)encodeN3Vector:(N3Vector)vector forKey:(NSString *)key;
+- (void)encodeN3Line:(N3Line)line forKey:(NSString *)key;
+- (void)encodeN3Plane:(N3Plane)plane forKey:(NSString *)key;
+
+- (N3AffineTransform)decodeN3AffineTransformForKey:(NSString *)key;
+- (N3Vector)decodeN3VectorForKey:(NSString *)key;
+- (N3Line)decodeN3LineForKey:(NSString *)key;
+- (N3Plane)decodeN3PlaneForKey:(NSString *)key;
+
+@end
 
 
 #endif /* __OBJC__ */

@@ -281,7 +281,6 @@ NSString* const OSIROIAddedROIKey = @"OSIROIAddedROIKey";
 - (void)_drawObjectsNotification:(NSNotification *)notification
 {
     DCMView *dcmView;
-    ViewerController *viewerController;
     OSIROI *roi;
     CGLPixelFormatObj pixelFormatObj;
     N3AffineTransform pixToDicomTransform;
@@ -305,7 +304,6 @@ NSString* const OSIROIAddedROIKey = @"OSIROIAddedROIKey";
         return;
     }
     
-    viewerController = (ViewerController *)self.delegate;
     dcmView = (DCMView *)[notification object];
         
     N3AffineTransformGetOpenGLMatrixd([dcmView pixToSubDrawRectTransform], pixToSubdrawRectOpenGLTransform);
@@ -331,8 +329,8 @@ NSString* const OSIROIAddedROIKey = @"OSIROIAddedROIKey";
                 glMatrixMode(GL_MODELVIEW);
                 glPushMatrix();
                 glMultMatrixd(pixToSubdrawRectOpenGLTransform);
-                
-                [roi drawSlab:slab inCGLContext:cgl_ctx pixelFormat:pixelFormatObj dicomToPixTransform:dicomToPixTransform];
+
+                [roi drawRect:NSMakeRect(0, 0, 1024, 1024) inSlab:slab inCGLContext:cgl_ctx pixelFormat:pixelFormatObj dicomToPixTransform:dicomToPixTransform];
                 
                 glMatrixMode(GL_MODELVIEW);
                 glPopMatrix();
@@ -429,7 +427,7 @@ NSString* const OSIROIAddedROIKey = @"OSIROIAddedROIKey";
 				}
 				
 				for (osirixROI in pixROIList) {
-					roi = [OSIROI ROIWithOsiriXROI:osirixROI pixToDICOMTransfrom:pixToDicomTransform homeFloatVolumeData:[_volumeWindow floatVolumeDataForDimensionsAndIndexes:@"movieIndex", [NSNumber numberWithInteger:i], nil]];
+					roi = [OSIROI ROIWithOsiriXROI:osirixROI pixToDICOMTransfrom:pixToDicomTransform];
 					if (roi) {
 						[newROIs addObject:roi];
                         [mutableWatchedROIs addObject:osirixROI];
@@ -459,8 +457,7 @@ NSString* const OSIROIAddedROIKey = @"OSIROIAddedROIKey";
 	NSString *name;
 	NSMutableDictionary *groupedNamesDict;
 	OSIROI *roi;
-    OSIFloatVolumeData *homeVolumeData;
-    
+
 	roiList = [self _ROIListForWatchedOsiriXROIs:watchedROIs];
 	roiNames = [[NSMutableSet alloc] init];
 	coalescedROIs = [NSMutableArray array];
@@ -481,8 +478,7 @@ NSString* const OSIROIAddedROIKey = @"OSIROIAddedROIKey";
 	}
 	
 	for (roisToCoalesce in [groupedNamesDict allValues]) {
-        homeVolumeData = [[roisToCoalesce objectAtIndex:0] homeFloatVolumeData];
-		roi = [OSIROI ROICoalescedWithSourceROIs:roisToCoalesce homeFloatVolumeData:homeVolumeData];
+		roi = [OSIROI ROICoalescedWithSourceROIs:roisToCoalesce];
 		if (roi) {
 			[coalescedROIs addObject:roi];
 		}
@@ -567,18 +563,18 @@ NSString* const OSIROIAddedROIKey = @"OSIROIAddedROIKey";
     //    slab.plane.point = N3VectorAdd(slab.plane.point, N3VectorScalarMultiply(N3VectorNormalize(slab.plane.normal), thickness/2.0));
 	
     for (roi in [self ROIs]) {
-        if ([[roi osiriXROIs] count] == 0) { //if this OSIROI is backed by old style ROI, don't draw it
-            if ([roi respondsToSelector:@selector(drawSlab:inCGLContext:pixelFormat:dicomToPixTransform:)]) {
+//        if ([[roi osiriXROIs] count] == 0) { //if this OSIROI is backed by old style ROI, don't draw it
+            if ([roi respondsToSelector:@selector(drawRect:inSlab:inCGLContext:pixelFormat:dicomToPixTransform:)]) {
                 glMatrixMode(GL_MODELVIEW);
                 glPushMatrix();
                 glMultMatrixd(pixToSubdrawRectOpenGLTransform);
                 
-                [roi drawSlab:slab inCGLContext:cgl_ctx pixelFormat:pixelFormatObj dicomToPixTransform:dicomToPixTransform];
+                [roi drawRect:NSMakeRect(0, 0, 1024, 1024) inSlab:slab inCGLContext:cgl_ctx pixelFormat:pixelFormatObj dicomToPixTransform:dicomToPixTransform];
                 
                 glMatrixMode(GL_MODELVIEW);
                 glPopMatrix();
             }
-        }
+//        }
     }
     
 }

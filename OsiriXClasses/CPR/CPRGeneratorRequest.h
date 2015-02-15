@@ -97,7 +97,8 @@
     N3Vector _origin;
     N3Vector _directionX;
     N3Vector _directionY;
-    
+    N3Vector _directionZ;
+
     CGFloat _pixelSpacingX;
     CGFloat _pixelSpacingY;
     
@@ -110,8 +111,10 @@
 @property (nonatomic, readwrite, assign) N3Vector origin;
 @property (nonatomic, readwrite, assign) N3Vector directionX;
 @property (nonatomic, readwrite, assign) N3Vector directionY;
+@property (nonatomic, readwrite, assign) N3Vector directionZ; // if this is N3VectorZero, it defaults to the cross product of the X and Y directions
 @property (nonatomic, readwrite, assign) CGFloat pixelSpacingX; // mm/pixel
 @property (nonatomic, readwrite, assign) CGFloat pixelSpacingY;
+@property (nonatomic, readwrite, assign) CGFloat pixelSpacingZ; // maps to slabSampleDistance
 
 @property (nonatomic, readwrite, assign) CPRProjectionMode projectionMode;
 

@@ -820,15 +820,10 @@ extern int splitPosition[ 3];
     
     for (i = 0; i < self.curvedVolumeData.pixelsDeep; i++)
 	{
-		if ([self.curvedVolumeData aquireInlineBuffer:&inlineBuffer]) {
-			newPix = [[DCMPix alloc] initWithData:(float *)CPRVolumeDataFloatBytes(&inlineBuffer) + (i*self.curvedVolumeData.pixelsWide*self.curvedVolumeData.pixelsHigh) :32 
-												 :self.curvedVolumeData.pixelsWide :self.curvedVolumeData.pixelsHigh :self.curvedVolumeData.pixelSpacingX :self.curvedVolumeData.pixelSpacingY
-												 :0.0 :0.0 :0.0 :NO];
-		} else {
-			assert(0);
-			newPix = [[DCMPix alloc] init];
-		}
-		[self.curvedVolumeData releaseInlineBuffer:&inlineBuffer];
+		[self.curvedVolumeData aquireInlineBuffer:&inlineBuffer];
+        newPix = [[DCMPix alloc] initWithData:(float *)CPRVolumeDataFloatBytes(&inlineBuffer) + (i*self.curvedVolumeData.pixelsWide*self.curvedVolumeData.pixelsHigh) :32
+                                             :self.curvedVolumeData.pixelsWide :self.curvedVolumeData.pixelsHigh :self.curvedVolumeData.pixelSpacingX :self.curvedVolumeData.pixelSpacingY
+                                             :0.0 :0.0 :0.0 :NO];
         
 		[newPix setImageObjectID: [[[self windowController] originalPix] imageObjectID]];
 		[newPix setSourceFile: [[[self windowController] originalPix] sourceFile]];

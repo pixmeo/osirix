@@ -35,6 +35,10 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+		4F4FAD491A9118B300B2EDFC /* OSIDerivedROI.h in Headers */ = {isa = PBXBuildFile; fileRef = 4F4FAD451A9118B300B2EDFC /* OSIDerivedROI.h */; };
+		4F4FAD4A1A9118B300B2EDFC /* OSIDerivedROI.m in Sources */ = {isa = PBXBuildFile; fileRef = 4F4FAD461A9118B300B2EDFC /* OSIDerivedROI.m */; };
+		4F4FAD4B1A9118B300B2EDFC /* OSIPETDerivedROI.h in Headers */ = {isa = PBXBuildFile; fileRef = 4F4FAD471A9118B300B2EDFC /* OSIPETDerivedROI.h */; };
+		4F4FAD4C1A9118B300B2EDFC /* OSIPETDerivedROI.m in Sources */ = {isa = PBXBuildFile; fileRef = 4F4FAD481A9118B300B2EDFC /* OSIPETDerivedROI.m */; };
 		4F8A1A851302C72300A022D9 /* N3BezierCore.h in Headers */ = {isa = PBXBuildFile; fileRef = 4F8A1A7D1302C72300A022D9 /* N3BezierCore.h */; };
 		4F8A1A861302C72300A022D9 /* N3BezierCore.m in Sources */ = {isa = PBXBuildFile; fileRef = 4F8A1A7E1302C72300A022D9 /* N3BezierCore.m */; };
 		4F8A1A871302C72300A022D9 /* N3BezierCoreAdditions.h in Headers */ = {isa = PBXBuildFile; fileRef = 4F8A1A7F1302C72300A022D9 /* N3BezierCoreAdditions.h */; };
@@ -6473,6 +6477,10 @@
 		1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = /System/Library/Frameworks/Cocoa.framework; sourceTree = "<absolute>"; };
 		29B97324FDCFA39411CA2CEA /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = /System/Library/Frameworks/AppKit.framework; sourceTree = "<absolute>"; };
 		29B97325FDCFA39411CA2CEA /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = /System/Library/Frameworks/Foundation.framework; sourceTree = "<absolute>"; };
+		4F4FAD451A9118B300B2EDFC /* OSIDerivedROI.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OSIDerivedROI.h; sourceTree = "<group>"; };
+		4F4FAD461A9118B300B2EDFC /* OSIDerivedROI.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OSIDerivedROI.m; sourceTree = "<group>"; };
+		4F4FAD471A9118B300B2EDFC /* OSIPETDerivedROI.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OSIPETDerivedROI.h; sourceTree = "<group>"; };
+		4F4FAD481A9118B300B2EDFC /* OSIPETDerivedROI.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OSIPETDerivedROI.m; sourceTree = "<group>"; };
 		4F8A1A7D1302C72300A022D9 /* N3BezierCore.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = N3BezierCore.h; path = nitrogen/Sources/N3BezierCore.h; sourceTree = "<group>"; };
 		4F8A1A7E1302C72300A022D9 /* N3BezierCore.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = N3BezierCore.m; path = nitrogen/Sources/N3BezierCore.m; sourceTree = "<group>"; };
 		4F8A1A7F1302C72300A022D9 /* N3BezierCoreAdditions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = N3BezierCoreAdditions.h; path = nitrogen/Sources/N3BezierCoreAdditions.h; sourceTree = "<group>"; };
@@ -13524,6 +13532,10 @@
 		847AFC7D1A14DFA20067AA07 /* OSI */ = {
 			isa = PBXGroup;
 			children = (
+				4F4FAD451A9118B300B2EDFC /* OSIDerivedROI.h */,
+				4F4FAD461A9118B300B2EDFC /* OSIDerivedROI.m */,
+				4F4FAD471A9118B300B2EDFC /* OSIPETDerivedROI.h */,
+				4F4FAD481A9118B300B2EDFC /* OSIPETDerivedROI.m */,
 				847AFC7E1A14DFA20067AA07 /* OSICoalescedPlanarROI.h */,
 				847AFC7F1A14DFA20067AA07 /* OSICoalescedPlanarROI.m */,
 				847AFC801A14DFA20067AA07 /* OSIEnvironment+Private.h */,
@@ -20449,6 +20461,7 @@
 				CEBD897614F1ADDA000DA1FE /* theora.h in Headers */,
 				CEBD897714F1ADDA000DA1FE /* theoradec.h in Headers */,
 				CEBD897814F1ADDA000DA1FE /* theoraenc.h in Headers */,
+				4F4FAD4B1A9118B300B2EDFC /* OSIPETDerivedROI.h in Headers */,
 				CEBD897914F1ADDA000DA1FE /* threads 2.h in Headers */,
 				CEBD897A14F1ADDA000DA1FE /* threads.h in Headers */,
 				CEBD897B14F1ADDA000DA1FE /* tif_config.h in Headers */,
@@ -21689,6 +21702,7 @@
 				CEBD8E1214F1ADDA000DA1FE /* vtkInfovisInstantiator.h in Headers */,
 				CEBD8E1314F1ADDA000DA1FE /* vtkInitialValueProblemSolver.h in Headers */,
 				847AFD731A14DFA30067AA07 /* OrthogonalMPRView.h in Headers */,
+				4F4FAD491A9118B300B2EDFC /* OSIDerivedROI.h in Headers */,
 				CEBD8E1414F1ADDA000DA1FE /* vtkInputStream.h in Headers */,
 				847AFCEB1A14DFA30067AA07 /* MyPoint.h in Headers */,
 				CEBD8E1514F1ADDA000DA1FE /* vtkInstantiator.h in Headers */,
@@ -24716,6 +24730,7 @@
 				BF3F219609CB8741002736A5 /* digsdfn.cc in Sources */,
 				847AFECF1A14DFA40067AA07 /* NSPreferencePane+OsiriX.mm in Sources */,
 				847AFE1E1A14DFA40067AA07 /* DicomDirParser.m in Sources */,
+				4F4FAD4C1A9118B300B2EDFC /* OSIPETDerivedROI.m in Sources */,
 				BF3F219309CB873E002736A5 /* didocu.cc in Sources */,
 				847AFE5F1A14DFA40067AA07 /* GetPrimaryMACAddress.m in Sources */,
 				847AFCE61A14DFA30067AA07 /* LoupeController.m in Sources */,
@@ -24766,6 +24781,7 @@
 				ABE46F970A76410F00327466 /* jcdctmgr.c in Sources */,
 				ABE46F980A76410F00327466 /* jcdiffct.c in Sources */,
 				ABE46F990A76410F00327466 /* jchuff.c in Sources */,
+				4F4FAD4A1A9118B300B2EDFC /* OSIDerivedROI.m in Sources */,
 				847AFDC41A14DFA40067AA07 /* CPRMPRDCMView.m in Sources */,
 				847AFDF21A14DFA40067AA07 /* BrowserController+Sources+Copy.m in Sources */,
 				847AFDA61A14DFA30067AA07 /* VRView.mm in Sources */,

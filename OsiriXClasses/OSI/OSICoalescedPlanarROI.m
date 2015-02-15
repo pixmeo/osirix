@@ -31,12 +31,12 @@
 @implementation OSICoalescedPlanarROI
 
 @synthesize sourceROIs = _sourceROIs;
+@synthesize volumeTransform = _volumeTransform;
 
-- (id)initWithSourceROIs:(NSArray *)rois homeFloatVolumeData:(OSIFloatVolumeData *)floatVolumeData
+- (id)initWithSourceROIs:(NSArray *)rois
 {
     if ( (self = [super init]) ) {
         _sourceROIs = [rois copy];
-        [self setHomeFloatVolumeData:floatVolumeData];
     }
     
     return self;
@@ -87,7 +87,7 @@
 
     maskRuns = [NSMutableArray array];
     
-    if ((floatVolume = self.homeFloatVolumeData)) {
+    if (N3AffineTransformEqualToTransform(floatVolume.volumeTransform, self.volumeTransform)) {
         for (roi in _sourceROIs) {
             [maskRuns addObjectsFromArray:[[roi ROIMaskForFloatVolumeData:floatVolume] maskRuns]];
         }
@@ -109,7 +109,7 @@
         assert(floatVolume.pixelsHigh == resampledVolume.pixelsHigh);
         assert(floatVolume.pixelsDeep == resampledVolume.pixelsDeep);
         
-        resampledMask = [OSIROIMask ROIMaskFromVolumeData:(OSIFloatVolumeData *)resampledVolume];
+        resampledMask = [OSIROIMask ROIMaskFromVolumeData:(OSIFloatVolumeData *)resampledVolume volumeTransform:NULL];
         
         return resampledMask;
     }
@@ -127,16 +127,6 @@
     }
     
     return osirixROIs;
-}
-
-- (void)setHomeFloatVolumeData:(OSIFloatVolumeData *)homeFloatVolumeData
-{
-    OSIROI *roi;
-
-    for (roi in _sourceROIs) {
-        [roi setHomeFloatVolumeData:homeFloatVolumeData];
-    }
-    [super setHomeFloatVolumeData:homeFloatVolumeData];
 }
 
 - (void)drawSlab:(OSISlab)slab inCGLContext:(CGLContextObj)cgl_ctx pixelFormat:(CGLPixelFormatObj)pixelFormat dicomToPixTransform:(N3AffineTransform)dicomToPixTransform
@@ -212,7 +202,7 @@
         
         for (roi in _sourceROIs) {
             for (hullPointValue in [roi convexHull]) {
-                hullPoint = N3VectorApplyTransform([hullPointValue N3VectorValue], self.homeFloatVolumeData.volumeTransform);
+                hullPoint = N3VectorApplyTransform([hullPointValue N3VectorValue], self.volumeTransform);
                 
                 minCorner.x = MIN(minCorner.x, hullPoint.x);
                 minCorner.y = MIN(minCorner.y, hullPoint.y);
@@ -234,7 +224,7 @@
         height = maxCorner.y - minCorner.y;
         depth = maxCorner.z - minCorner.z;
         
-        coalescedROIMaskVolumeTransform = N3AffineTransformConcat(self.homeFloatVolumeData.volumeTransform, N3AffineTransformMakeTranslation(-minCorner.x, -minCorner.y, -minCorner.z));
+        coalescedROIMaskVolumeTransform = N3AffineTransformConcat(self.volumeTransform, N3AffineTransformMakeTranslation(-minCorner.x, -minCorner.y, -minCorner.z));
         
         coalescedROIMaskVolumeBytes = malloc(width * height * depth * sizeof(float));
         memset(coalescedROIMaskVolumeBytes, 0, width * height * depth * sizeof(float));
@@ -320,7 +310,7 @@
     sliceRequest.sliceToDicomTransform = N3AffineTransformConcat(N3AffineTransformMakeTranslation(minCorner.x, minCorner.y, 0), N3AffineTransformInvert(dicomToPixTransform));
     
     floatVolumeData = [CPRGenerator synchronousRequestVolume:sliceRequest volumeData:self.coalescedROIMaskVolumeData];
-    sliceMask = [OSIROIMask ROIMaskFromVolumeData:(OSIFloatVolumeData *)floatVolumeData];
+    sliceMask = [OSIROIMask ROIMaskFromVolumeData:(OSIFloatVolumeData *)floatVolumeData volumeTransform:NULL];
     
     if (minCornerPtr) {
         *minCornerPtr = minCorner;

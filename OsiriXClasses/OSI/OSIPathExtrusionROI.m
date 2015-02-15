@@ -33,10 +33,9 @@
 @synthesize strokeColor = _strokeColor;
 @synthesize strokeThickness = _strokeThickness;
 
-- (id)initWith:(N3BezierPath *)path slab:(OSISlab)slab homeFloatVolumeData:(OSIFloatVolumeData *)floatVolumeData name:(NSString *)name
+- (id)initWith:(N3BezierPath *)path slab:(OSISlab)slab name:(NSString *)name
 {
 	if ( (self = [super init]) ) {
-        [self setHomeFloatVolumeData:floatVolumeData];
         self.path = path;
         self.slab = slab;
         self.name = name;
@@ -114,7 +113,6 @@
 	N3Vector endpoint;
 	NSArray	*intersections;
 	NSMutableArray *intersectionNumbers;
-	NSMutableArray *ROIRuns;
 	OSIROIMaskRun maskRun;
 	CGFloat minY;
 	CGFloat maxY;
@@ -137,7 +135,6 @@
     [volumeBezierPath applyAffineTransform:N3AffineTransformConcat(floatVolume.volumeTransform, N3AffineTransformMakeTranslation(0, -.5, 0))];
 	[volumeBezierPath flatten:N3BezierDefaultFlatness];
 	zSet = NO;
-	ROIRuns = [NSMutableArray array];
 	minY = CGFLOAT_MAX;
 	maxY = -CGFLOAT_MAX;
     z = 0;

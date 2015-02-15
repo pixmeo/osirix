@@ -16,6 +16,7 @@
 #import "OSIROI+Private.h"
 #import "OSIPlanarPathROI.h"
 #import "OSIPlanarBrushROI.h"
+#import "OSIMaskROI.h"
 #import "OSICoalescedPlanarROI.h"
 #import "OSIROIFloatPixelData.h"
 #import "OSIFloatVolumeData.h"
@@ -23,12 +24,13 @@
 #import "N3Geometry.h"
 #import "ROI.h"
 
+NSString* const OSIPasteboardTypeMaskROI = @"com.rossetantoine.osirix.maskROI";
+NSString* const OSIPasteboardTypeCodingROI = @"com.rossetantoine.osirix.codingROI";
+
 @implementation OSIROI
 
 - (void)dealloc
 {
-    [_homeFloatVolumeData release];
-    _homeFloatVolumeData = nil;
     [super dealloc];
 }
 
@@ -140,24 +142,12 @@
 	return [NSSet set];
 }
 
-- (NSString *)label
-{
-	NSString *metric;
-	NSMutableString *label;
-	
-	label = [NSMutableString string];
-	for (metric in [self metricNames]) {
-		[label appendFormat:@"%@: %@%@, ", [self labelForMetric:metric], [self valueForMetric:metric], [self unitForMetric:metric]];
-	}
-	return label;
-}
-
 - (NSArray *)metricNames
 {
 	return [NSArray arrayWithObjects:@"intensityMean", @"intensityMax", @"intensityMin", @"volume", nil];
 }
 
-- (NSString *)labelForMetric:(NSString *)metric
+- (NSString *)localizedNameForMetric:(NSString *)metric
 {
 	if ([metric isEqualToString:@"intensityMean"]) {
 		return @"Mean Intensity"; // localize me!
@@ -169,7 +159,7 @@
 	return nil;
 }
 
-- (NSString *)unitForMetric:(NSString *)metric // make me smarter!
+- (NSString *)unitForMetric:(NSString *)metric
 {
 	if ([metric isEqualToString:@"intensityMean"]) {
 		return @"";
@@ -184,14 +174,14 @@
 	return nil;
 }
 
-- (id)valueForMetric:(NSString *)metric
+- (id)valueForMetric:(NSString *)metric floatVolumeData:(OSIFloatVolumeData *)floatVolumeData;
 {
 	if ([metric isEqualToString:@"intensityMean"]) {
-		return [NSNumber numberWithDouble:[self intensityMeanWithFloatVolumeData:[self homeFloatVolumeData]]];
+		return [NSNumber numberWithDouble:[self intensityMeanWithFloatVolumeData:floatVolumeData]];
 	} else if ([metric isEqualToString:@"intensityMax"]) {
-		return [NSNumber numberWithDouble:[self intensityMaxWithFloatVolumeData:[self homeFloatVolumeData]]];
+		return [NSNumber numberWithDouble:[self intensityMaxWithFloatVolumeData:floatVolumeData]];
 	} else if ([metric isEqualToString:@"intensityMin"]) {
-		return [NSNumber numberWithDouble:[self intensityMinWithFloatVolumeData:[self homeFloatVolumeData]]];
+		return [NSNumber numberWithDouble:[self intensityMinWithFloatVolumeData:floatVolumeData]];
 	} else if ([metric isEqualToString:@"volume"]) {
 		return [NSNumber numberWithDouble:(double)[self volume]];
 	}
@@ -215,14 +205,7 @@
 
 - (CGFloat)volume
 {
-    OSIROIMask *mask = [self ROIMaskForFloatVolumeData:[self homeFloatVolumeData]];
-    CGFloat voxelVolumeCM3 = self.homeFloatVolumeData.pixelSpacingX * self.homeFloatVolumeData.pixelSpacingY * self.homeFloatVolumeData.pixelSpacingZ* .001;
-    return (CGFloat)[mask maskIndexCount]*voxelVolumeCM3;
-}
-
-- (OSIROIFloatPixelData *)ROIFloatPixelData
-{
-	return [self ROIFloatPixelDataForFloatVolumeData:[self homeFloatVolumeData]];
+    return -1;
 }
 
 - (OSIROIFloatPixelData *)ROIFloatPixelDataForFloatVolumeData:(OSIFloatVolumeData *)floatVolume; // convenience method
@@ -235,19 +218,6 @@
 	return [[[OSIROIFloatPixelData alloc] initWithROIMask:roiMask floatVolumeData:floatVolume] autorelease];
 }
 
-- (OSIFloatVolumeData *)homeFloatVolumeData // the volume data on which the ROI was drawn
-{
-	return _homeFloatVolumeData;
-}
-
-- (void)setHomeFloatVolumeData:(OSIFloatVolumeData *)homeFloatVolumeData
-{
-    if (homeFloatVolumeData != _homeFloatVolumeData) {
-        [_homeFloatVolumeData release];
-        _homeFloatVolumeData = [homeFloatVolumeData retain];
-    }
-}
-
 - (N3BezierPath *)bezierPath
 {
     return nil;
@@ -255,9 +225,13 @@
 
 - (N3Vector)centerOfMass
 {
-    OSIROIMask *roiMask;
-    roiMask = [self ROIMaskForFloatVolumeData:[self homeFloatVolumeData]];
-    return N3VectorApplyTransform([roiMask centerOfMass], N3AffineTransformInvert([[self homeFloatVolumeData] volumeTransform]));
+    assert(0);
+    return N3VectorZero;
+}
+
+- (void)drawRect:(NSRect)rect inSlab:(OSISlab)slab inCGLContext:(CGLContextObj)glContext pixelFormat:(CGLPixelFormatObj)pixelFormat dicomToPixTransform:(N3AffineTransform)dicomToPixTransform
+{
+    [self drawSlab:slab inCGLContext:glContext pixelFormat:pixelFormat dicomToPixTransform:dicomToPixTransform];
 }
 
 - (void)drawSlab:(OSISlab)slab inCGLContext:(CGLContextObj)glContext pixelFormat:(CGLPixelFormatObj)pixelFormat dicomToPixTransform:(N3AffineTransform)dicomToPixTransform;
@@ -265,11 +239,54 @@
     
 }
 
+- (id)initWithPasteboardPropertyList:(id)propertyList ofType:(NSString *)type
+{
+    [self autorelease];
+    self = nil;
+    if ([type isEqualToString:OSIPasteboardTypeMaskROI] || [type isEqualToString:OSIPasteboardTypeCodingROI]) {
+        self = [[NSKeyedUnarchiver unarchiveObjectWithData:propertyList] retain];
+    }
+    return self;
+}
+
++ (NSArray *)readableTypesForPasteboard:(NSPasteboard *)pasteboard
+{
+    return @[OSIPasteboardTypeCodingROI, OSIPasteboardTypeMaskROI];
+}
+
++ (NSPasteboardReadingOptions)readingOptionsForType:(NSString *)type pasteboard:(NSPasteboard *)pasteboard
+{
+    return NSPasteboardReadingAsData;
+}
+
+- (NSArray *)writableTypesForPasteboard:(NSPasteboard *)pasteboard
+{
+    NSMutableArray *types = [NSMutableArray array];
+    if ([self conformsToProtocol:@protocol(NSCoding)]) {
+        [types addObject:OSIPasteboardTypeCodingROI];
+    }
+    [types addObject:OSIPasteboardTypeMaskROI];
+    return types;
+}
+
+- (id)pasteboardPropertyListForType:(NSString *)type
+{
+    if ([type isEqualToString:OSIPasteboardTypeMaskROI] && [self isKindOfClass:[OSIMaskROI class]] == NO) {
+        OSIMaskROI *maskROI = [[[OSIMaskROI alloc] initWithROIMask:[(OSIMaskROI *)self mask] volumeTransform:[(OSIMaskROI *)self volumeTransform] name:[self name]] autorelease];
+        return [NSKeyedArchiver archivedDataWithRootObject:maskROI];
+    } if ([self conformsToProtocol:@protocol(NSCoding)]) {
+        return [NSKeyedArchiver archivedDataWithRootObject:(id<NSCoding>)self];
+    } else {
+        return nil;
+    }
+}
+
+
 @end
 
 @implementation OSIROI (Private)
 
-+ (id)ROIWithOsiriXROI:(ROI *)roi pixToDICOMTransfrom:(N3AffineTransform)pixToDICOMTransfrom homeFloatVolumeData:(OSIFloatVolumeData *)floatVolumeData;
++ (id)ROIWithOsiriXROI:(ROI *)roi pixToDICOMTransfrom:(N3AffineTransform)pixToDICOMTransfrom;
 {
 	switch ([roi type]) {
 		case tMesure:
@@ -278,19 +295,19 @@
 		case tOval:
 		case tROI:
         case tPencil:
-			return [[[OSIPlanarPathROI alloc] initWithOsiriXROI:roi pixToDICOMTransfrom:pixToDICOMTransfrom homeFloatVolumeData:floatVolumeData] autorelease];
+			return [[[OSIPlanarPathROI alloc] initWithOsiriXROI:roi pixToDICOMTransfrom:pixToDICOMTransfrom] autorelease];
 			break;
         case tPlain:
-            return [[[OSIPlanarBrushROI alloc] initWithOsiriXROI:roi pixToDICOMTransfrom:pixToDICOMTransfrom homeFloatVolumeData:floatVolumeData] autorelease];
+            return [[[OSIPlanarBrushROI alloc] initWithOsiriXROI:roi pixToDICOMTransfrom:pixToDICOMTransfrom] autorelease];
 		default:
 			return nil;;
 	}
 }
 
 
-+ (id)ROICoalescedWithSourceROIs:(NSArray *)rois homeFloatVolumeData:(OSIFloatVolumeData *)floatVolumeData
++ (id)ROICoalescedWithSourceROIs:(NSArray *)rois
 {
-	return [[[OSICoalescedPlanarROI alloc] initWithSourceROIs:rois homeFloatVolumeData:floatVolumeData] autorelease];
+	return [[[OSICoalescedPlanarROI alloc] initWithSourceROIs:rois] autorelease];
 }
 
 

@@ -20,6 +20,10 @@
 static const CGFloat _N3GeometrySmallNumber = (CGFLOAT_MIN * 1E5);
 
 const N3Vector N3VectorZero = {0.0, 0.0, 0.0};
+const N3Vector N3VectorXBasis = {1.0, 0.0, 0.0};
+const N3Vector N3VectorYBasis = {0.0, 1.0, 0.0};
+const N3Vector N3VectorZBasis = {0.0, 0.0, 1.0};
+
 const N3AffineTransform N3AffineTransformIdentity = {1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0};
 const N3Line N3LineXAxis = {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}};
 const N3Line N3LineYAxis = {{0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}};
@@ -198,6 +202,21 @@ N3Vector N3VectorInvert(N3Vector vector)
     return N3VectorSubtract(N3VectorZero, vector);
 }
 
+N3Vector N3VectorRound(N3Vector vector)
+{
+    N3Vector newVector;
+#if CGFLOAT_IS_DOUBLE
+    newVector.x = round(vector.x);
+    newVector.y = round(vector.y);
+    newVector.z = round(vector.z);
+#else
+    newVector.x = roundf(vector.x);
+    newVector.y = roundf(vector.y);
+    newVector.z = roundf(vector.z);
+#endif
+    return newVector;
+}
+
 N3Vector N3VectorApplyTransform(N3Vector vector, N3AffineTransform transform)
 {
     N3Vector newVector;
@@ -300,6 +319,11 @@ void N3VectorNormalizeVectors(N3VectorArray vectors, CFIndex numVectors)
     for (i = 0; i < numVectors; i++) {
         vectors[i] = N3VectorNormalize(vectors[i]);
     }
+}
+
+NSPoint NSPointApplyN3AffineTransform(NSPoint point, N3AffineTransform transform)
+{
+    return NSPointFromN3Vector(N3VectorApplyTransform(N3VectorMakeFromNSPoint(point), transform));
 }
 
 N3Vector N3VectorLerp(N3Vector vector1, N3Vector vector2, CGFloat t)
@@ -694,6 +718,49 @@ NSString *NSStringFromN3Plane(N3Plane plane)
 	return [NSString stringWithFormat:@"{%@, %@}", NSStringFromN3Vector(plane.point), NSStringFromN3Vector(plane.normal)];
 }
 
+CFDictionaryRef N3AffineTransformCreateDictionaryRepresentation(N3AffineTransform transform)
+{
+    CFDictionaryRef dict;
+    CFStringRef keys[16];
+    CFNumberRef numbers[16];
+
+    int i;
+    int j;
+
+    for (i = 0; i < 4; i++) {
+        for (j = 0; j < 4; j++) {
+            CFStringRef label = CFStringCreateWithFormat (NULL, NULL, CFSTR("m%d%d"), i+1, j+1);
+            keys[(i*4)+j] = label;
+        }
+    }
+
+    numbers[0] = CFNumberCreate(kCFAllocatorDefault, kCFNumberCGFloatType, &(transform.m11));
+    numbers[1] = CFNumberCreate(kCFAllocatorDefault, kCFNumberCGFloatType, &(transform.m12));
+    numbers[2] = CFNumberCreate(kCFAllocatorDefault, kCFNumberCGFloatType, &(transform.m13));
+    numbers[3] = CFNumberCreate(kCFAllocatorDefault, kCFNumberCGFloatType, &(transform.m14));
+    numbers[4] = CFNumberCreate(kCFAllocatorDefault, kCFNumberCGFloatType, &(transform.m21));
+    numbers[5] = CFNumberCreate(kCFAllocatorDefault, kCFNumberCGFloatType, &(transform.m22));
+    numbers[6] = CFNumberCreate(kCFAllocatorDefault, kCFNumberCGFloatType, &(transform.m23));
+    numbers[7] = CFNumberCreate(kCFAllocatorDefault, kCFNumberCGFloatType, &(transform.m24));
+    numbers[8] = CFNumberCreate(kCFAllocatorDefault, kCFNumberCGFloatType, &(transform.m31));
+    numbers[9] = CFNumberCreate(kCFAllocatorDefault, kCFNumberCGFloatType, &(transform.m32));
+    numbers[10] = CFNumberCreate(kCFAllocatorDefault, kCFNumberCGFloatType, &(transform.m33));
+    numbers[11] = CFNumberCreate(kCFAllocatorDefault, kCFNumberCGFloatType, &(transform.m34));
+    numbers[12] = CFNumberCreate(kCFAllocatorDefault, kCFNumberCGFloatType, &(transform.m41));
+    numbers[13] = CFNumberCreate(kCFAllocatorDefault, kCFNumberCGFloatType, &(transform.m42));
+    numbers[14] = CFNumberCreate(kCFAllocatorDefault, kCFNumberCGFloatType, &(transform.m43));
+    numbers[15] = CFNumberCreate(kCFAllocatorDefault, kCFNumberCGFloatType, &(transform.m44));
+
+    dict = CFDictionaryCreate(kCFAllocatorDefault, (const void **)keys, (const void **)numbers, 16, &kCFCopyStringDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+
+    for (i = 0; i < 16; i++) {
+        CFRelease(keys[i]);
+        CFRelease(numbers[i]);
+    }
+
+    return dict;
+}
+
 CFDictionaryRef N3VectorCreateDictionaryRepresentation(N3Vector vector)
 {
 	CFDictionaryRef dict;
@@ -743,6 +810,65 @@ CFDictionaryRef N3PlaneCreateDictionaryRepresentation(N3Plane plane)
 	CFRelease(pointDict);
 	CFRelease(normalDict);
 	return lineDict;
+}
+
+bool N3AffineTransformMakeWithDictionaryRepresentation(CFDictionaryRef dict, N3AffineTransform *transform)
+{
+    CFStringRef keys[16];
+    CFNumberRef numbers[16];
+    CGFloat* tranformPtrs[16];
+    N3AffineTransform tempTransform;
+
+    memset(keys, 0, sizeof(CFStringRef) * 16);
+    memset(numbers, 0, sizeof(CFNumberRef) * 16);
+
+    int i;
+    int j;
+
+    for (i = 0; i < 4; i++) {
+        for (j = 0; j < 4; j++) {
+            CFStringRef label = CFStringCreateWithFormat (NULL, NULL, CFSTR("m%d%d"), i+1, j+1);
+            keys[(i*4)+j] = label;
+        }
+    }
+
+    tranformPtrs[0] = &(tempTransform.m11);
+    tranformPtrs[1] = &(tempTransform.m12);
+    tranformPtrs[2] = &(tempTransform.m13);
+    tranformPtrs[3] = &(tempTransform.m14);
+    tranformPtrs[4] = &(tempTransform.m21);
+    tranformPtrs[5] = &(tempTransform.m22);
+    tranformPtrs[6] = &(tempTransform.m23);
+    tranformPtrs[7] = &(tempTransform.m24);
+    tranformPtrs[8] = &(tempTransform.m31);
+    tranformPtrs[9] = &(tempTransform.m32);
+    tranformPtrs[10] = &(tempTransform.m33);
+    tranformPtrs[11] = &(tempTransform.m34);
+    tranformPtrs[12] = &(tempTransform.m41);
+    tranformPtrs[13] = &(tempTransform.m42);
+    tranformPtrs[14] = &(tempTransform.m43);
+    tranformPtrs[15] = &(tempTransform.m44);
+
+    for (i = 0; i < 16; i++) {
+        numbers[i] = CFDictionaryGetValue(dict, keys[i]);
+        CFRelease(keys[j]);
+        if (numbers[i] == NULL || CFGetTypeID(numbers[i]) != CFNumberGetTypeID()) {
+            for (j = 0; j <= (numbers[i] == NULL ? i-1 : i); j++) {
+                CFRelease(keys[j]);
+            }
+            return false;
+        }
+    }
+
+    for (i = 0; i < 16; i++) {
+        CFNumberGetValue(numbers[i], kCFNumberCGFloatType, tranformPtrs[i]);
+    }
+
+    if (transform) {
+        *transform = tempTransform;
+    }
+
+    return true;
 }
 
 bool N3VectorMakeWithDictionaryRepresentation(CFDictionaryRef dict, N3Vector *vector)
@@ -1071,6 +1197,95 @@ N3AffineTransform N3AffineTransformMakeFromOpenGLMatrixf(float *f) // f better b
 
 @end
 
+@implementation NSCoder (N3GeometryAdditions)
+
+- (void)encodeN3AffineTransform:(N3AffineTransform)transform forKey:(NSString *)key
+{
+    NSDictionary *dict = (NSDictionary *)N3AffineTransformCreateDictionaryRepresentation(transform);
+    [self encodeObject:dict forKey:key];
+    [dict release];
+}
+
+- (void)encodeN3Vector:(N3Vector)vector forKey:(NSString *)key
+{
+    NSDictionary *dict = (NSDictionary *)N3VectorCreateDictionaryRepresentation(vector);
+    [self encodeObject:dict forKey:key];
+    [dict release];
+}
+
+- (void)encodeN3Line:(N3Line)line forKey:(NSString *)key
+{
+    NSDictionary *dict = (NSDictionary *)N3LineCreateDictionaryRepresentation(line);
+    [self encodeObject:dict forKey:key];
+    [dict release];
+}
+
+- (void)encodeN3Plane:(N3Plane)plane forKey:(NSString *)key
+{
+    NSDictionary *dict = (NSDictionary *)N3PlaneCreateDictionaryRepresentation(plane);
+    [self encodeObject:dict forKey:key];
+    [dict release];
+}
+
+- (N3AffineTransform)decodeN3AffineTransformForKey:(NSString *)key
+{
+    N3AffineTransform transform = N3AffineTransformIdentity;
+    NSDictionary *dict = [self decodeObjectOfClass:[NSDictionary class] forKey:key];
+    if (dict == nil) {
+        [NSException raise:@"OSIDecode" format:@"No Dictionary when decoding N3AffineTranform"];
+    }
+
+    if (N3AffineTransformMakeWithDictionaryRepresentation((CFDictionaryRef)dict, &transform) == NO) {
+        [NSException raise:@"OSIDecode" format:@"Dictionary did not contain an N3AffineTranform"];
+    }
+    return transform;
+}
+
+- (N3Vector)decodeN3VectorForKey:(NSString *)key
+{
+    N3Vector vector = N3VectorZero;
+    NSDictionary *dict = [self decodeObjectOfClass:[NSDictionary class] forKey:key];
+    if (dict == nil) {
+        [NSException raise:@"OSIDecode" format:@"No Dictionary when decoding N3Vector"];
+    }
+
+    if (N3VectorMakeWithDictionaryRepresentation((CFDictionaryRef)dict, &vector) == NO) {
+        [NSException raise:@"OSIDecode" format:@"Dictionary did not contain an N3Vector"];
+    }
+    return vector;
+}
+
+- (N3Line)decodeN3LineForKey:(NSString *)key
+{
+    N3Line line = N3LineInvalid;
+    NSDictionary *dict = [self decodeObjectOfClass:[NSDictionary class] forKey:key];
+    if (dict == nil) {
+        [NSException raise:@"OSIDecode" format:@"No Dictionary when decoding N3Line"];
+    }
+
+    if (N3LineMakeWithDictionaryRepresentation((CFDictionaryRef)dict, &line) == NO) {
+        [NSException raise:@"OSIDecode" format:@"Dictionary did not contain an N3Line"];
+    }
+    return line;
+}
+
+
+- (N3Plane)decodeN3PlaneForKey:(NSString *)key
+{
+    N3Plane plane = N3PlaneInvalid;
+    NSDictionary *dict = [self decodeObjectOfClass:[NSDictionary class] forKey:key];
+    if (dict == nil) {
+        [NSException raise:@"OSIDecode" format:@"No Dictionary when decoding N3Plane"];
+    }
+
+    if (N3PlaneMakeWithDictionaryRepresentation((CFDictionaryRef)dict, &plane) == NO) {
+        [NSException raise:@"OSIDecode" format:@"Dictionary did not contain an N3Plane"];
+    }
+    return plane;
+}
+
+
+@end
 
 
 

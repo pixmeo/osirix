@@ -2679,7 +2679,10 @@ static CGFloat CPRMPRDCMViewCurveMouseTrackingDistance = 20.0;
     pixToDicomTransform.m31 = orientation[6];
     pixToDicomTransform.m32 = orientation[7];
     pixToDicomTransform.m33 = orientation[8];
-    
+
+    // Because Dicom uses Center rule and DCMPix uses Top-Left Rule
+    pixToDicomTransform = N3AffineTransformConcat(N3AffineTransformMakeTranslation(-.5, -.5, 0), pixToDicomTransform);
+
 	#ifndef NDEBUG
 	if( isnan( pix.pixelSpacingX) || isnan( pix.pixelSpacingY) || pix.pixelSpacingX <= 0 || pix.pixelSpacingY <= 0 || pix.pixelSpacingX > 1000 || pix.pixelSpacingY > 1000)
 		NSLog( @"******* CPR pixel spacing incorrect for pixToSubDrawRectTransform");

@@ -135,8 +135,12 @@ static NSOperationQueue *_obliqueSliceOperationFillQueue = nil;
             origin = self.request.origin;
             leftDirection = N3VectorScalarMultiply(N3VectorNormalize(self.request.directionX), self.request.pixelSpacingX);
             downDirection = N3VectorScalarMultiply(N3VectorNormalize(self.request.directionY), self.request.pixelSpacingY);
-            inSlabNormal = N3VectorScalarMultiply(N3VectorNormalize(N3VectorCrossProduct(leftDirection, downDirection)), [self _slabSampleDistance]);
-                        
+            if (N3VectorEqualToVector(self.request.directionZ, N3VectorZero)) {
+                inSlabNormal = N3VectorScalarMultiply(N3VectorNormalize(N3VectorCrossProduct(leftDirection, downDirection)), [self _slabSampleDistance]);
+            } else {
+                inSlabNormal = N3VectorScalarMultiply(N3VectorNormalize(self.request.directionZ), [self _slabSampleDistance]);
+            }
+
             _floatBytes = malloc(sizeof(float) * pixelsWide * pixelsHigh * pixelsDeep);
             vectors = malloc(sizeof(N3Vector) * pixelsWide);
             fillVectors = malloc(sizeof(N3Vector) * pixelsWide);
@@ -311,7 +315,11 @@ static NSOperationQueue *_obliqueSliceOperationFillQueue = nil;
 
 - (NSUInteger)_pixelsDeep
 {
-    return MAX(self.request.slabWidth / [self _slabSampleDistance], 0) + 1;
+#if CGFLOAT_IS_DOUBLE
+    return MAX(round(self.request.slabWidth / [self _slabSampleDistance]), 1.0);
+#else
+    return MAX(roundf(self.request.slabWidth / [self _slabSampleDistance]), 1.0f);
+#endif
 }
 
 - (N3AffineTransform)_generatedVolumeTransform
@@ -324,8 +332,12 @@ static NSOperationQueue *_obliqueSliceOperationFillQueue = nil;
     
     leftDirection = N3VectorScalarMultiply(N3VectorNormalize(self.request.directionX), self.request.pixelSpacingX);
     downDirection = N3VectorScalarMultiply(N3VectorNormalize(self.request.directionY), self.request.pixelSpacingY);
-    inSlabNormal = N3VectorScalarMultiply(N3VectorNormalize(N3VectorCrossProduct(leftDirection, downDirection)), [self _slabSampleDistance]);
-    
+    if (N3VectorEqualToVector(self.request.directionZ, N3VectorZero)) {
+        inSlabNormal = N3VectorScalarMultiply(N3VectorNormalize(N3VectorCrossProduct(leftDirection, downDirection)), [self _slabSampleDistance]);
+    } else {
+        inSlabNormal = N3VectorScalarMultiply(N3VectorNormalize(self.request.directionZ), [self _slabSampleDistance]);
+    }
+
     volumeOrigin = N3VectorAdd(self.request.origin, N3VectorScalarMultiply(inSlabNormal, (CGFloat)([self _pixelsDeep] - 1)/-2.0));
     
     volumeTransform = N3AffineTransformIdentity;

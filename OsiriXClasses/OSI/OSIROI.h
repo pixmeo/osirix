@@ -16,10 +16,6 @@
 #import "OSIGeometry.h"
 #import <OpenGL/CGLTypes.h>
 
-// abstract 
-
-//@class OSIROIFloatPixelData;
-//@class OSIFloatVolumeData;
 @class OSIStudy;
 @class ROI;
 @class OSIROIMask;
@@ -27,11 +23,7 @@
 @class OSIROIFloatPixelData;
 @class N3BezierPath;
 
-// this is an abstract class
-// how do you identify an ROI? Does an ROI have an ID and that is how you know what an ROI is, or is the ROI the actual object...
-// polygon compilation ROI
-
-/**  
+/**
  
  OSIROI is an abstract ROI class. It is the super class of all OsiriX SDK plugin ROI types and provides basic support for accessing pixel data and properties common to all ROIs.
  
@@ -42,9 +34,10 @@
  
  */
 
+extern NSString* const OSIPasteboardTypeMaskROI;
+extern NSString* const OSIPasteboardTypeCodingROI; // an ROI that implements NSCoding
 
-@interface OSIROI : NSObject {
-    OSIFloatVolumeData *_homeFloatVolumeData;
+@interface OSIROI : NSObject <NSPasteboardWriting, NSPasteboardReading>  {
 }
 
 //@property (nonatomic, readwrite, assign) void *context;
@@ -54,7 +47,6 @@
 ///-----------------------------------
 /// @name Getting ROI Attributes
 ///-----------------------------------
-
 
 /** Returns the name of the receiver.
  
@@ -105,18 +97,6 @@
  */
 - (void)setStrokeThickness:(CGFloat)strokeThickness;
 
-/** Returns a reasonable label to print for the receiver.
- 
- The OSIROI implementation of this method concatenates the labels for all the available metrics.
- 
- Concrete subclasses may override this method to return more meaningful labels.
- 
- @return A reasonable label to print for the receiver.
- @see labelForMetric:
- @see metricNames
- */
-- (NSString *)label;
-
 /** Returns an array of `NSString` objects that represent the names of all the metrics that can be recovered from this ROI.
   
  Concrete subclasses may override this method to return additional metrics.
@@ -125,7 +105,7 @@
  @see label
  @see labelForMetric:
  @see unitForMetric:
- @see valueForMetric:
+ @see valueForMetric:floatVolumeData:
 */
 - (NSArray *)metricNames;
 
@@ -138,9 +118,9 @@
  @see label
  @see metricNames
  @see unitForMetric:
- @see valueForMetric:
+ @see valueForMetric:floatVolumeData:
  */
-- (NSString *)labelForMetric:(NSString *)metric;
+- (NSString *)localizedNameForMetric:(NSString *)metric;
 
 /** Returns the unit for a given metric.
  
@@ -151,7 +131,7 @@
  @see label
  @see metricNames
  @see labelForMetric:
- @see valueForMetric:
+ @see valueForMetric:floatVolumeData:
  */
 - (NSString *)unitForMetric:(NSString *)metric;
 
@@ -161,12 +141,13 @@
   
  @return The value for a given metric.
  @param metric The metric name for which to return a value.
+ @param floatVolumeData The OSIFloatVolumeData to use to generate the values.
  @see label
  @see metricNames
  @see labelForMetric:
  @see unitForMetric:
  */
-- (id)valueForMetric:(NSString *)metric;
+- (id)valueForMetric:(NSString *)metric floatVolumeData:(OSIFloatVolumeData *)floatVolumeData;
 
 /** Returns the mean intesity of this ROI under the given float volume data.
  
@@ -219,24 +200,12 @@
 
 //- (OSIStudy *)study;
 
-/** Returns the float pixel data under this ROI.
- 
- This is a convenience for getting the pixel data in the receiver's home float volume.
- 
- @return The float pixel data under this ROI.
- @see homeFloatVolumeData
- @see ROIFloatPixelDataForFloatVolumeData:
- @see ROIMaskForFloatVolumeData:
- */
-- (OSIROIFloatPixelData *)ROIFloatPixelData; // convenience method
-
 /** Returns the a OSIROIFloatPixelData object that can be used to access pixels under this ROI in the given Float Volume data.
 
  This is a convenience for getting the ROI Mask for the given Float Volume Data and generating a Float Pixel Data object from that mask and the given Float Volume Data.
 
  @return The a OSIROIFloatPixelData object that can be used to access pixels under this ROI in the given Float Volume data.
  @param floatVolume the Float Volume Data for which to generate a Float Pixel Data object.
- @see homeFloatVolumeData
  @see ROIFloatPixelData
  @see ROIMaskForFloatVolumeData:
  */
@@ -248,36 +217,11 @@
  
  @return The a OSIROIFloatPixelData object that can be used to access pixels under this ROI in the given Float Volume data.
  @param floatVolume the Float Volume Data for which to generate a mask.
- @see homeFloatVolumeData
  @see ROIFloatPixelData
  @see ROIFloatPixelDataForFloatVolumeData:
  */
 - (OSIROIMask *)ROIMaskForFloatVolumeData:(OSIFloatVolumeData *)floatVolume;
 //- (BOOL)containsVector:(OSIVector)vector;
-
-
-/** Returns the original Float Volume Data on which the receiver or the OsiriX `ROI` objects this reciever represents were drawn on.
-  
- @warning The homeFloatVolumeData can change or become nil as OsiriX allocates and deallocates memory.
-
- 
- @return The a OSIROIFloatPixelData object that can be used to access pixels under this ROI in the given Float Volume data
- @see ROIFloatPixelData
- @see ROIMaskForFloatVolumeData:
- @see ROIFloatPixelDataForFloatVolumeData:
- */
-- (OSIFloatVolumeData *)homeFloatVolumeData; // the volume data on which the ROI was drawn
-
-
-/** Set the original Float Volume Data on which the receiver or the OsiriX `ROI` objects this reciever represents were drawn on.
-  
- @warning The homeFloatVolumeData can change or become nil as OsiriX allocates and deallocates memory.
-  
- @see ROIFloatPixelData
- @see ROIMaskForFloatVolumeData:
- @see ROIFloatPixelDataForFloatVolumeData:
- */
-- (void)setHomeFloatVolumeData:(OSIFloatVolumeData *)homeVolumeData;
 
 //- (NSDictionary *)dictionaryRepresentation; // make sure this is a plist serializable dictionary;
 
@@ -325,7 +269,10 @@
  
  @return An array of points that represent the outside bounds of the ROI.
  */
-- (void)drawSlab:(OSISlab)slab inCGLContext:(CGLContextObj)glContext pixelFormat:(CGLPixelFormatObj)pixelFormat dicomToPixTransform:(N3AffineTransform)dicomToPixTransform;
+- (void)drawRect:(NSRect)rect inSlab:(OSISlab)slab inCGLContext:(CGLContextObj)glContext pixelFormat:(CGLPixelFormatObj)pixelFormat dicomToPixTransform:(N3AffineTransform)dicomToPixTransform;
+
+- (void)drawSlab:(OSISlab)slab inCGLContext:(CGLContextObj)glContext pixelFormat:(CGLPixelFormatObj)pixelFormat dicomToPixTransform:(N3AffineTransform)dicomToPixTransform __deprecated;
+
 
 // for drawing in 3D what we really want is for the ROI to return a VTK actor, and then it will be the actor and VTK that will decide how to draw
 

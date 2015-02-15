@@ -72,7 +72,10 @@
     pixToDicomTransform.m31 = pixOrientation[6];
     pixToDicomTransform.m32 = pixOrientation[7];
     pixToDicomTransform.m33 = pixOrientation[8];
-    
+
+    // Because Dicom uses Center rule and DCMPix uses Top-Left Rule
+    pixToDicomTransform = N3AffineTransformConcat(N3AffineTransformMakeTranslation(-.5, -.5, 0), pixToDicomTransform);
+
     return pixToDicomTransform;
 }
 
