@@ -32,7 +32,7 @@
 #import "ROIWindow.h"
 #import "ToolbarPanel.h"
 #import "ThumbnailsListPanel.h"
-#import "NSUserDefaultsController+OsiriX.h"
+#import "NSUserDefaultsController+N2.h"
 #import "DicomStudy.h"
 #import "DicomSeries.h"
 #import "DicomImage.h"
@@ -51,6 +51,8 @@
 #import "DicomDatabase.h"
 #import "NSFileManager+N2.h"
 #import <QuartzCore/QuartzCore.h>
+#import "DCMUSRegion.h"
+#import "NSUserDefaults+OsiriX.h"
 
 // kvImageHighQualityResampling
 #define QUALITY kvImageNoFlags
@@ -64,7 +66,7 @@ static		unsigned char				*PETredTable = nil, *PETgreenTable = nil, *PETblueTable
 static		BOOL						NOINTERPOLATION = NO, SOFTWAREINTERPOLATION = NO, IndependentCRWLWW, pluginOverridesMouse = NO;  // Allows plugins to override mouse click actions.
             BOOL						FULL32BITPIPELINE = NO, gDontListenToSyncMessage = NO;
             BOOL                        OVERFLOWLINES = NO;
-			int							CLUTBARS, MAXNUMBEROF32BITVIEWERS = 4, SOFTWAREINTERPOLATION_MAX, DISPLAYCROSSREFERENCELINES = YES;
+			int							CLUTBARS, MAXNUMBEROF32BITVIEWERS = 8, SOFTWAREINTERPOLATION_MAX, DISPLAYCROSSREFERENCELINES = YES;
 static		BOOL						gClickCountSet = NO, avoidSetWLWWRentry = NO, gInvertColors = NO;
 static		NSDictionary				*_hotKeyDictionary = nil, *_hotKeyModifiersDictionary = nil;
 static		NSRecursiveLock				*drawLock = nil;
@@ -437,8 +439,8 @@ BOOL lineIntersectsRect(NSPoint lineStarts, NSPoint lineEnds, NSRect rect)
 
 NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context)
 {
-    NSDate *d1 = [[v1 currentStudy] valueForKey:@"date"];
-    NSDate *d2 = [[v2 currentStudy] valueForKey:@"date"];
+    NSDate *d1 = v1.currentStudy.date;
+    NSDate *d2 = v2.currentStudy.date;
 	
 	if( d1 == nil || d2 == nil)
 	{
@@ -464,38 +466,13 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 
 @implementation DCMView
 
-@synthesize showDescriptionInLarge, curRoiList;
-@synthesize drawingFrameRect;
-@synthesize rectArray, studyColorR, studyColorG, studyColorB, studyDateIndex;
-@synthesize flippedData, whiteBackground, timeIntervalForDrag;
-@synthesize dcmPixList;
-@synthesize dcmFilesList;
-@synthesize dcmRoiList;
-@synthesize syncSeriesIndex;
-@synthesize syncRelativeDiff;
-@synthesize blendingMode, blendingView, blendingFactor;
-@synthesize xFlipped, yFlipped;
-@synthesize stringID;
-@synthesize currentTool, currentToolRight;
-@synthesize curImage;
-@synthesize theMatrix = matrix;
-@synthesize suppressLabels = suppress_labels;
-@synthesize scaleValue, rotation;
-@synthesize origin;
-@synthesize curDCM;
-@synthesize dcmExportPlugin;
-@synthesize mouseXPos, mouseYPos;
-@synthesize contextualMenuInWindowPosX, contextualMenuInWindowPosY;
-@synthesize fontListGL, fontGL;
-@synthesize tag = _tag;
-@synthesize curWW, curWL;
-@synthesize rows = _imageRows, columns = _imageColumns;
-@synthesize cursor;
-@synthesize eraserFlag;
-@synthesize drawing;
-@synthesize volumicSeries;
-@synthesize isKeyView, mouseDragging;
-@synthesize annotationType;
+@synthesize showDescriptionInLarge, curRoiList, cleanedOutDcmPixArray, mousePosUSRegion;
+@synthesize drawingFrameRect, rectArray, studyColorR, studyColorG, studyColorB, studyDateIndex;
+@synthesize flippedData, whiteBackground, timeIntervalForDrag, dcmPixList, dcmFilesList, dcmRoiList, syncSeriesIndex, syncRelativeDiff;
+@synthesize blendingMode, blendingView, blendingFactor, xFlipped, yFlipped, stringID, currentTool, currentToolRight, curImage, theMatrix = matrix;
+@synthesize suppressLabels = suppress_labels, scaleValue, rotation, origin, curDCM, dcmExportPlugin;
+@synthesize mouseXPos, mouseYPos, contextualMenuInWindowPosX, contextualMenuInWindowPosY, fontListGL, fontGL, tag = _tag, curWW, curWL;
+@synthesize rows = _imageRows, columns = _imageColumns, cursor, eraserFlag, drawing, isKeyView, mouseDragging, annotationType;
 
 - (BOOL) eventToPlugins: (NSEvent*) event
 {
@@ -516,7 +493,12 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
     gDontListenToSyncMessage = v;
     
     if( gDontListenToSyncMessage == NO)
-        [[[ViewerController frontMostDisplayed2DViewer] imageView] sendSyncMessage: 0];
+    {
+        ViewerController *v = [ViewerController frontMostDisplayed2DViewer];
+        
+        if( v.isEverythingLoaded)
+            [[v imageView] sendSyncMessage: 0];
+    }
 }
 
 + (BOOL) intersectionBetweenTwoLinesA1:(NSPoint) a1 A2:(NSPoint) a2 B1:(NSPoint) b1 B2:(NSPoint) b2 result:(NSPoint*) r
@@ -693,10 +675,10 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	}
 }
 
-+ (BOOL) noPropagateSettingsInSeriesForModality: (NSString*) m
++ (BOOL) noPropagateSettingsInSeriesForModality: (DicomImage*) imageObj
 {
 	if( IndependentCRWLWW &&
-       [[NSUserDefaults standardUserDefaults] boolForKey: [NSString stringWithFormat: @"noPropagateInSeriesFor%@", m]])
+       [[NSUserDefaults standardUserDefaults] boolForKey: [NSString stringWithFormat: @"noPropagateInSeriesFor%@", imageObj.modality]])
 		return YES;
 	else
 		return NO;
@@ -787,14 +769,14 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
                 NSPredicate *predicate = nil;
                 
                 // FIND ALL STUDIES of this patient
-                NSString *searchString = [study valueForKey:@"patientUID"];
+                NSString *searchString = study.patientUID;
                 
                 if( [searchString length] == 0 || [searchString isEqualToString:@"0"])
                 {
-                    searchString = [study valueForKey:@"name"];
+                    searchString = study.name;
                     predicate = [NSPredicate predicateWithFormat: @"(name == %@)", searchString];
                 }
-                else predicate = [NSPredicate predicateWithFormat: @"(patientUID BEGINSWITH[cd] %@)", searchString];
+                else predicate = [NSPredicate predicateWithFormat: @"(patientUID == %@)", searchString];
                 
                 allStudiesArray = [db objectsForEntity:db.studyEntity predicate:predicate];
                 allStudiesArray = [allStudiesArray sortedArrayUsingDescriptors: [NSArray arrayWithObject: [NSSortDescriptor sortDescriptorWithKey: @"date" ascending: NO]]];
@@ -934,6 +916,12 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 
 	DCMPix *newPix = [originalPix mergeWithDCMPix: fusedPix offset: oo];
 	
+    if( newPix.shutterEnabled)
+    {
+        newPix.shutterEnabled = NO;
+        newPix.shutterRect = NSMakeRect(0, 0, 0, 0);
+    }
+    
 	return newPix;
 }
 
@@ -941,7 +929,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 {
 	BOOL applyToEntireSeries = NO;
 	
-	if( [blendingView volumicSeries] && [self volumicSeries]) applyToEntireSeries = YES;
+	if( blendingView.volumicData == 1 && self.volumicData == 1) applyToEntireSeries = YES;
 	
 	NSMutableArray *pixA = [NSMutableArray array];
 	NSMutableArray *objA = [NSMutableArray array];
@@ -1199,7 +1187,8 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
             [self setIndex: [[[note userInfo] valueForKey:@"z"] intValue]];
             
             [self sendSyncMessage: 0];
-			[self setNeedsDisplay: YES];
+            
+            [self setNeedsDisplay: YES];
 		}
 	}
 }
@@ -1216,14 +1205,14 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	drawingROI = NO;
 	for( ROI *r in curRoiList)
 	{
-		if( curROI != r )
+		if( curROI != r)
 		{
 			if( [r ROImode] == ROI_selectedModify || [r ROImode] == ROI_drawing)
 				[r setROIMode: ROI_selected];
 		}
 	}
 	
-	if( curROI )
+	if( curROI)
 	{
 		if( [curROI ROImode] == ROI_selectedModify || [curROI ROImode] == ROI_drawing)
 		{
@@ -1240,17 +1229,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 				curROI.ROImode = ROI_selected;
 				
 				if( [curROI valid] == NO)
-				{
-					[[NSNotificationCenter defaultCenter] postNotificationName: OsirixRemoveROINotification object: curROI userInfo: nil];
-					
-					@try
-					{
-						[curRoiList removeObject: curROI];
-					}
-					@catch (NSException * e) {}
-                    
-                    [[NSNotificationCenter defaultCenter] postNotificationName:OsirixROIRemovedFromArrayNotification object:NULL userInfo:NULL];
-				}
+                    [ROI deleteROI: curROI];
 				
 				[curROI autorelease];
 				curROI = nil;
@@ -1290,28 +1269,41 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 - (void) roiLoadFromFilesArray: (NSArray*) filenames
 {
 	// Unselect all ROIs
-	for( ROI *r in curRoiList) [r setROIMode: ROI_sleep];
+	for( ROI *r in curRoiList)
+        [r setROIMode: ROI_sleep];
 	
 	for( NSString *path in filenames)
 	{
-		NSMutableArray*    roiArray = [NSUnarchiver unarchiveObjectWithFile: path];
-
-		for( id loopItem1 in roiArray)
-		{
-			[loopItem1 setOriginAndSpacing:curDCM.pixelSpacingX :curDCM.pixelSpacingY :[DCMPix originCorrectedAccordingToOrientation: curDCM]];
-			[loopItem1 setROIMode: ROI_selected];
-			[loopItem1 setRoiView :self];
-			
-			[[NSNotificationCenter defaultCenter] postNotificationName: OsirixROISelectedNotification object: loopItem1 userInfo: nil];
-		}
-		
-		if( [[NSUserDefaults standardUserDefaults] boolForKey: @"markROIImageAsKeyImage"])
-		{
-			if( [self is2DViewer] == YES && [self isKeyImage] == NO && [[self windowController] isPostprocessed] == NO)
-				[[self windowController] setKeyImage: self];
-		}
-		
-		[curRoiList addObjectsFromArray: roiArray];
+		NSArray* roiArray = [NSUnarchiver unarchiveObjectWithFile: path];
+        
+        if( [roiArray isKindOfClass: [NSArray class]])
+        {
+            BOOL corrupted = NO;
+            
+            for( ROI *r in roiArray)
+            {
+                if( [r isKindOfClass: [ROI class]])
+                {
+                    r.pix = curDCM;
+                    [r setOriginAndSpacing:curDCM.pixelSpacingX :curDCM.pixelSpacingY :[DCMPix originCorrectedAccordingToOrientation: curDCM]];
+                    [r setROIMode: ROI_selected];
+                    r.curView = self;
+                    
+                    [[NSNotificationCenter defaultCenter] postNotificationName: OsirixROISelectedNotification object: r userInfo: nil];
+                }
+                else
+                    corrupted = YES;
+            }
+            
+            if( [[NSUserDefaults standardUserDefaults] boolForKey: @"markROIImageAsKeyImage"])
+            {
+                if( [self is2DViewer] == YES && [self isKeyImage] == NO && [[self windowController] isPostprocessed] == NO)
+                    [[self windowController] setKeyImage: self];
+            }
+            
+            if( !corrupted)
+                [curRoiList addObjectsFromArray: roiArray];
+        }
 	}
 	
 	[self setNeedsDisplay:YES];
@@ -1426,11 +1418,11 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
     
     NSArray *pointsStringArray = [xml objectForKey: @"ROIPoints"];
     
-    ToolMode type = tCPolygon;
+    int type = tCPolygon;
     if( [pointsStringArray count] == 2) type = tMesure;
     if( [pointsStringArray count] == 1) type = t2DPoint;
     
-    ROI *roi = [[[ROI alloc] initWithType: type :curDCM.pixelSpacingX :curDCM.pixelSpacingY :[DCMPix originCorrectedAccordingToOrientation: curDCM]] autorelease];
+    ROI *roi = [ROI roiWithType: type inView: self];
     roi.name = [xml objectForKey: @"Name"];
     roi.comments = [xml objectForKey: @"Comments"];
     
@@ -1454,7 +1446,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
         
         roi.points = pointsArray;
         roi.ROImode = ROI_selected;
-        [roi setRoiView :self];
+        roi.curView = self;
         if( [[NSUserDefaults standardUserDefaults] boolForKey: @"markROIImageAsKeyImage"])
         {
             if( [self is2DViewer] == YES && [self isKeyImage] == NO && [[self windowController] isPostprocessed] == NO)
@@ -1479,9 +1471,9 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	// Unselect all ROIs
 	for( ROI *r in curRoiList) [r setROIMode: ROI_sleep];
 	
-	for( i = 0; i < [filenames count]; i++)
+	for( NSString *filename in filenames)
 	{
-		NSDictionary *xml = [NSDictionary dictionaryWithContentsOfFile: [filenames objectAtIndex:i]];
+		NSDictionary *xml = [NSDictionary dictionaryWithContentsOfFile: filename];
 		NSArray* roiArray = [xml objectForKey: @"ROI array"];
 		
 		if( roiArray)
@@ -1519,42 +1511,43 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 		NSMutableArray*	roiArray = [NSUnarchiver unarchiveObjectWithData: archived_data];
 		
 		// Unselect all ROIs
-		for( ROI *r in curRoiList) [r setROIMode: ROI_sleep];
+		for( ROI *r in curRoiList)
+            [r setROIMode: ROI_sleep];
 		
 		for( ROI *r in roiArray)
 		{
 			r.isAliased = NO;
 			
-			//Correct the origin only if the orientation is the same
-			r.pix = curDCM;
+            r.pix = curDCM;
+            [curRoiList addObject: r];
+            
+            //Correct the origin only if the orientation is the same
 			[r setOriginAndSpacing :curDCM.pixelSpacingX : curDCM.pixelSpacingY :[DCMPix originCorrectedAccordingToOrientation: curDCM]];
 			
 			[r setROIMode: ROI_selected];
-			[r setRoiView :self];
+			r.curView = self;
 		}
-		
+        
 		if( [[NSUserDefaults standardUserDefaults] boolForKey: @"markROIImageAsKeyImage"])
 		{
 			if( [self is2DViewer] == YES && [self isKeyImage] == NO && [[self windowController] isPostprocessed] == NO)
 					[[self windowController] setKeyImage: self];
 		}
 		
-		[curRoiList addObjectsFromArray: roiArray];
-		
-        for( long i = 0 ; i < [roiArray count] ; i++) {
-            NSDictionary *userInfo = [NSDictionary dictionaryWithObjectsAndKeys:[roiArray objectAtIndex: i], @"ROI",
+        for( ROI *roi in roiArray)
+        {
+            NSDictionary *userInfo = [NSDictionary dictionaryWithObjectsAndKeys: roi, @"ROI",
                                                 [NSNumber numberWithInt:curImage],	@"sliceNumber",
-                                                //xx, @"x", yy, @"y", zz, @"z",
                                                 nil];
             
             [[NSNotificationCenter defaultCenter] postNotificationName: OsirixAddROINotification object: self userInfo:userInfo];
         }
 
         
-		for( long i = 0 ; i < [roiArray count] ; i++)
-			[[NSNotificationCenter defaultCenter] postNotificationName: OsirixROISelectedNotification object: [roiArray objectAtIndex: i] userInfo: nil];
+		for( ROI *roi in roiArray)
+			[[NSNotificationCenter defaultCenter] postNotificationName: OsirixROISelectedNotification object: roi userInfo: nil];
 
-		[self setNeedsDisplay:YES];
+        [self setIndex: curImage];
 	}
 	
 	id winCtrl = self.windowController;
@@ -1571,7 +1564,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	
 	for( ROI *r in curRoiList)
 	{
-		if( [r ROImode] == ROI_selected)
+		if( (r.ROImode == ROI_selected || r.ROImode == ROI_selectedModify || r.ROImode == ROI_drawing))
 		{
 			roiSelected = YES;
 			
@@ -1596,11 +1589,11 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 		
 		NSMutableString *r = [NSMutableString string];
 		
-		for( long i = 0 ; i < [roiSelectedArray count] ; i++ )
+        for( ROI *roi in roiSelectedArray)
 		{
-			[r appendString: [[roiSelectedArray objectAtIndex: i] description]];
+			[r appendString: [roi description]];
 			
-			if( i != (long)[roiSelectedArray count]-1)
+			if( roi != roiSelectedArray.lastObject)
 				[r appendString:@"\r"];
 		}
 		
@@ -1612,42 +1605,29 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 {
 	[self copy:sender];
 	
-	long	i;
-	NSTimeInterval groupID;
+	NSTimeInterval groupID = 0;
 
 	[[self windowController] addToUndoQueue:@"roi"];
 	
 	[drawLock lock];
 	
-    NSMutableArray *rArray = curRoiList;
-    
-    [rArray retain];
+    NSMutableArray *roisToDelete = [NSMutableArray array];
     
 	@try 
 	{
-		for( i = 0; i < [rArray count]; i++)
+		for( ROI *r in curRoiList)
 		{
-			ROI *r = [rArray objectAtIndex:i];
-			if( [r ROImode] == ROI_selected && r.locked == NO)
-			{
-				groupID = [r groupID];
-				[[NSNotificationCenter defaultCenter] postNotificationName:OsirixRemoveROINotification object:r userInfo: nil];
-				[rArray removeObjectAtIndex:i];
-				i--;
-				if(groupID!=0.0)
-					[self deleteROIGroupID:groupID];
-			}
+			if( (r.ROImode == ROI_selected || r.ROImode == ROI_selectedModify || r.ROImode == ROI_drawing) && r.locked == NO)
+                [roisToDelete addObject: r];
 		}
-		
-		[[NSNotificationCenter defaultCenter] postNotificationName: OsirixROIRemovedFromArrayNotification object: nil userInfo: nil];
+        
+        [ROI deleteROIs: roisToDelete];
 	}
 	@catch (NSException * e) 
 	{
 		N2LogExceptionWithStackTrace(e);
 	}
     
-    [rArray autorelease];
-	
 	[drawLock unlock];
 	
 	[self setNeedsDisplay:YES];
@@ -1661,13 +1641,13 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	{
         @try {
             // Series Level
-            [self.seriesObj  setValue:[NSNumber numberWithBool:yFlipped] forKey:@"yFlipped"];
+            self.seriesObj.yFlipped = @(yFlipped);
             
             // Image Level
             if( (curImage >= 0 && dcmFilesList.count > curImage) && COPYSETTINGSINSERIES == NO)
-                [self.imageObj setValue:[NSNumber numberWithBool:yFlipped] forKey:@"yFlipped"];
+                self.imageObj.yFlipped = @(yFlipped);
             else
-                [self.imageObj setValue: nil forKey:@"yFlipped"];
+                self.imageObj.yFlipped = nil;
 		}
         @catch ( NSException *e) {
             N2LogException( e);
@@ -1686,13 +1666,13 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	if( [self is2DViewer] && [[self windowController] isPostprocessed] == NO)
     {
         @try {
-            [self.seriesObj setValue:[NSNumber numberWithBool:xFlipped] forKey:@"xFlipped"];
+            self.seriesObj.xFlipped = @(xFlipped);
             
             // Image Level
             if( (curImage >= 0 && dcmFilesList.count > curImage) && COPYSETTINGSINSERIES == NO)
-                [self.imageObj setValue:[NSNumber numberWithBool:xFlipped] forKey:@"xFlipped"];
+                self.imageObj.xFlipped = @(xFlipped);
             else
-                [self.imageObj setValue: nil forKey:@"xFlipped"];
+                self.imageObj.xFlipped = nil;
         }
         @catch ( NSException *e) {
             N2LogException( e);
@@ -1915,7 +1895,8 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	if( keepROITool == NO)
 	{
 		// Unselect previous ROIs
-		for( ROI *r in curRoiList) [r setROIMode : ROI_sleep];
+		for( ROI *r in curRoiList)
+            [r setROIMode : ROI_sleep];
 	}
 	
 	NSEvent *event = [[NSApplication sharedApplication] currentEvent];
@@ -1933,6 +1914,9 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	
 	switch( currentTool)
 	{
+        default:
+            break;
+            
 		case tPlain:
 			if ([self is2DViewer] == YES)
 			{
@@ -1979,7 +1963,6 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 				}
 			}
 		break;
-        default:;
 	}
 	
 	[self setCursorForView : currentTool];
@@ -1999,7 +1982,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
     if( origin.x != 0 && origin.y != 0)
         return NO;
     
-    if( fabs( s - self.scaleValue) < 0.1)
+    if( fabs( s - self.scaleValue) < 0.02)
         return YES;
     else
         return NO;
@@ -2044,14 +2027,40 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	scaleToFitNoReentry = NO;
 }
 
+- (void) delete3DROIsAliases
+{
+    NSMutableArray *aliasesToBeRemoved = [NSMutableArray array];
+    for( int x = 0 ; x < curRoiList.count ; x++)
+    {
+        ROI *r = [curRoiList objectAtIndex: x];
+        
+        if(r.is3DROI && r.pix != self.curDCM && self.curDCM != nil)
+        {
+//            [[NSNotificationCenter defaultCenter] postNotificationName: OsirixRemoveROINotification object: r userInfo: nil];
+            
+//            NSLog( @"%@", r.pix);
+//            NSLog( @"%@", self.curDCM);
+            
+            [aliasesToBeRemoved addObject: r];
+        }
+    }
+    
+    if( aliasesToBeRemoved.count)
+    {
+        [curRoiList removeObjectsInArray: aliasesToBeRemoved];
+        [[NSNotificationCenter defaultCenter] postNotificationName:OsirixROIRemovedFromArrayNotification object:NULL userInfo:NULL];
+    }
+}
+
 - (void) setIndexWithReset:(short) index :(BOOL) sizeToFit
 {
 	TextureComputed32bitPipeline = NO;
-	
-	if( dcmPixList && index >= 0)
+    
+    if( index >= (int) dcmPixList.count)
+        index = 0;
+    
+	if( dcmPixList && index >= 0 && index < [dcmPixList count] && [[dcmFilesList objectAtIndex: index] isDistant] == NO)
 	{
-		[[self window] setAcceptsMouseMovedEvents: YES];
-		
 		[curROI autorelease];
 		curROI = nil;
 		
@@ -2065,12 +2074,13 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 		[curRoiList autorelease];
 		
 		if( dcmRoiList) curRoiList = [[dcmRoiList objectAtIndex: curImage] retain];
-		else 			curRoiList = [[NSMutableArray alloc] initWithCapacity:0];
+		else 			curRoiList = [NSMutableArray new];
 		
 		for( ROI *r in curRoiList)
 		{
-			[r setRoiView :self];
-			[r recompute];
+			r.curView = self;
+			[r resetCache];
+            [r recompute];
 			// Unselect previous ROIs
 			[r setROIMode : ROI_sleep];
 		}
@@ -2099,13 +2109,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 		[self setNeedsDisplay:YES];
 		
 		[yearOld release];
-		
-		
-		if( [[[dcmFilesList objectAtIndex: curImage] valueForKeyPath:@"series.study.yearOld"] isEqualToString: [[dcmFilesList objectAtIndex: curImage] valueForKeyPath:@"series.study.yearOldAcquisition"]])
-			yearOld = [[[dcmFilesList objectAtIndex: curImage] valueForKeyPath:@"series.study.yearOld"] retain];
-		else
-			yearOld = [[NSString stringWithFormat:@"%@ / %@", [[dcmFilesList objectAtIndex: curImage] valueForKeyPath:@"series.study.yearOld"], [[dcmFilesList objectAtIndex: curImage] valueForKeyPath:@"series.study.yearOldAcquisition"]] retain];
-        
+        yearOld = nil;
         
         if( self.is2DViewer)
         {
@@ -2145,35 +2149,33 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 		curDCM = nil;
 		
 		volumicData = -1;
+        areDCMPixParallel = -1;
 		
-        [cleanedOutDcmPixArray release];
-        cleanedOutDcmPixArray = nil;
+        self.cleanedOutDcmPixArray = nil;
         
 		if( dcmPixList != pixels)
 		{
 			[dcmPixList release];
 			dcmPixList = [pixels retain];
 			
-			volumicSeries = YES;
-			
-			if( [files count] > 0)
-			{
-				id sopclassuid = [[files objectAtIndex: 0] valueForKeyPath:@"series.seriesSOPClassUID"];
-				if ([DCMAbstractSyntaxUID isImageStorage: sopclassuid] || [DCMAbstractSyntaxUID isRadiotherapy: sopclassuid] || [DCMAbstractSyntaxUID isStructuredReport: sopclassuid] || sopclassuid == nil)
-				{
-					
-				}
-				else NSLog( @"*** DCMView ! ****** It's not a DICOM image ? SOP Class UID: %@", sopclassuid);
-			}
-			
-			if( [stringID isEqualToString:@"previewDatabase"] == NO)
-			{
-				if( [dcmPixList count] > 1)
-				{
-					if( [(DCMPix*)[dcmPixList objectAtIndex: 0] sliceLocation] == [(DCMPix*)[dcmPixList lastObject] sliceLocation]) volumicSeries = NO;
-				}
-				else volumicSeries = NO;
-			}
+            curWW = curWL = 0;
+            
+            DicomImage *imageObj = [files lastObject];
+            
+            BOOL a = ![DCMView noPropagateSettingsInSeriesForModality: [files objectAtIndex: dcmPixList.count/2]];
+            
+            if( self.COPYSETTINGSINSERIES != a)
+                [self setCOPYSETTINGSINSERIESdirectly: a];
+            
+//			if( [files count] > 0)
+//			{
+//				id sopclassuid = [[files objectAtIndex: 0] valueForKeyPath:@"series.seriesSOPClassUID"];
+//				if ([DCMAbstractSyntaxUID isImageStorage: sopclassuid] || [DCMAbstractSyntaxUID isRadiotherapy: sopclassuid] || [DCMAbstractSyntaxUID isStructuredReport: sopclassuid] || sopclassuid == nil)
+//				{
+//					
+//				}
+//				else NSLog( @"*** DCMView ! ****** It's not a DICOM image ? SOP Class UID: %@", sopclassuid);
+//			}
 		}
 		
 		if( dcmFilesList != files)
@@ -2208,6 +2210,8 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 		N2LogExceptionWithStackTrace(e);
 	}
 	
+    firstDisplay = [NSDate timeIntervalSinceReferenceDate];
+    
 	[drawLock unlock];
 }
 
@@ -2219,7 +2223,6 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 - (void) dealloc
 {
 	NSLog(@"DCMView released");
-    
     
     @try
     {
@@ -2235,10 +2238,10 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	
 	[self deleteMouseDownTimer];
 	
-	[matrix release];
+	[matrix autorelease];
 	matrix = nil;
     
-	[cursorTracking release];
+	[cursorTracking autorelease];
 	cursorTracking = nil;
     
 	[drawLock lock];
@@ -2250,28 +2253,28 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	[curRoiList autorelease];
 	curRoiList = nil;
 	
-	[dcmRoiList release];
+	[dcmRoiList autorelease];
 	dcmRoiList = nil;
 	
 	@synchronized( self)
 	{
-		[dcmFilesList release];
+		[dcmFilesList autorelease];
 		dcmFilesList = nil;
 		
-		[dcmPixList release];
+		[dcmPixList autorelease];
 		dcmPixList = nil;
 	}
 	
-	[curDCM release];
+	[curDCM autorelease];
 	curDCM = nil;
 	
-	[dcmExportPlugin release];
+	[dcmExportPlugin autorelease];
 	dcmExportPlugin = nil;
 	
-	[stringID release];
+	[stringID autorelease];
 	stringID = nil;
 	
-    NSAutoreleasePool *pool = [NSAutoreleasePool new];
+    @autoreleasepool {
     @try
     {
         [[self openGLContext] makeCurrentContext];
@@ -2311,31 +2314,31 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
         if( blendingColorBuf) free( blendingColorBuf);
         blendingColorBuf = nil;
         
-        [fontColor release]; fontColor = nil;
-        [fontGL release]; fontGL = nil;
-        [labelFont release]; labelFont = nil;
-        [yearOld release]; yearOld = nil;
+        [fontColor autorelease]; fontColor = nil;
+        [fontGL autorelease]; fontGL = nil;
+        [labelFont autorelease]; labelFont = nil;
+        [yearOld autorelease]; yearOld = nil;
         
-        [cursor release]; cursor = nil;
+        [cursor autorelease]; cursor = nil;
         
         @synchronized( globalStringTextureCache)
         {
             [globalStringTextureCache removeObject: stringTextureCache];
         }
-        [stringTextureCache release];
+        [stringTextureCache autorelease];
         stringTextureCache = 0L;
         
         [_mouseDownTimer invalidate];
-        [_mouseDownTimer release];
+        [_mouseDownTimer autorelease];
         _mouseDownTimer = nil;
         
-        [destinationImage release];
+        [destinationImage autorelease];
         destinationImage = nil;
         
         if(repulsorColorTimer)
         {
             [repulsorColorTimer invalidate];
-            [repulsorColorTimer release];
+            [repulsorColorTimer autorelease];
             repulsorColorTimer = nil;
         }
         
@@ -2345,35 +2348,36 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
         if( blendingResampledBaseAddr) free( blendingResampledBaseAddr);
         blendingResampledBaseAddr = nil;
         
-        [showDescriptionInLargeText release];
+        [showDescriptionInLargeText autorelease];
         showDescriptionInLargeText = nil;
         
-        [warningNotice release];
+        [warningNotice autorelease];
         warningNotice = nil;
         
-        [blendingView release];
+        [blendingView autorelease];
         blendingView = nil;
         
         [self deleteLens];
         
-        [loupeImage release];
+        [loupeImage autorelease];
         loupeImage = nil;
         
-        [loupeMaskImage release];
+        [loupeMaskImage autorelease];
         loupeMaskImage = nil;
         
-        [studyDateBox release];
+        [studyDateBox autorelease];
         studyDateBox = nil;
         
-        [cleanedOutDcmPixArray release];
+        [cleanedOutDcmPixArray autorelease];
         cleanedOutDcmPixArray = nil;
+        
+        self.mousePosUSRegion = nil;
     }
     @catch (NSException * e)
 	{
 		N2LogExceptionWithStackTrace(e);
 	}
-    
-    [pool release];
+    }
     
     [super dealloc];
 }
@@ -2390,48 +2394,51 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 
 - (void) setCOPYSETTINGSINSERIES: (BOOL) b
 {
-	ViewerController *v = [self windowController];
-	
-	COPYSETTINGSINSERIES = b;
-
-	for( int i = 0 ; i < [v  maxMovieIndex]; i++)
-	{
-		for( DCMPix *pix in [v pixList: i])
-		{
-            if( pix.isLoaded)
-                [pix changeWLWW :curWL :curWW];
-			
-			if( COPYSETTINGSINSERIES)
-			{
-                DicomImage *im = pix.imageObj;
+    COPYSETTINGSINSERIES = b;
+    
+    if( self.is2DViewer)
+    {
+        ViewerController *v = [self windowController];
+        
+        for( int i = 0 ; i < [v maxMovieIndex]; i++)
+        {
+            for( DCMPix *pix in [v pixList: i])
+            {
+                if( pix.isLoaded)
+                    [pix changeWLWW :curWL :curWW];
                 
-				[im setValue: nil forKey:@"windowWidth"];
-				[im setValue: nil forKey:@"windowLevel"];
-				[im setValue: nil forKey:@"scale"];
-				[im setValue: nil forKey:@"rotationAngle"];
-				[im setValue: nil forKey:@"yFlipped"];
-				[im setValue: nil forKey:@"xFlipped"];
-				[im setValue: nil forKey:@"xOffset"];
-				[im setValue: nil forKey:@"yOffset"];
-			}
-			else
-			{
-                DicomImage *im = pix.imageObj;
-                
-				[im setValue:[NSNumber numberWithFloat:curWW] forKey:@"windowWidth"];
-				[im setValue:[NSNumber numberWithFloat:curWL] forKey:@"windowLevel"];
-                if( [self isScaledFit] == NO)
-                    [im setValue:[NSNumber numberWithFloat:scaleValue] forKey:@"scale"];
+                if( COPYSETTINGSINSERIES)
+                {
+                    DicomImage *im = pix.imageObj;
+                    
+                    im.windowWidth = nil;
+                    im.windowLevel = nil;
+                    im.scale = nil;
+                    im.rotationAngle = nil;
+                    im.yFlipped = nil;
+                    im.xFlipped = nil;
+                    im.xOffset = nil;
+                    im.yOffset = nil;
+                }
                 else
-                    [im setValue:nil forKey:@"scale"];
-				[im setValue:[NSNumber numberWithFloat:rotation] forKey:@"rotationAngle"];
-				[im setValue:[NSNumber numberWithBool:yFlipped] forKey:@"yFlipped"];
-				[im setValue:[NSNumber numberWithBool:yFlipped] forKey:@"xFlipped"];
-				[im setValue:[NSNumber numberWithFloat:origin.x] forKey:@"xOffset"];
-				[im setValue:[NSNumber numberWithFloat:origin.y] forKey:@"yOffset"];
-			}
-		}
-	}
+                {
+                    DicomImage *im = pix.imageObj;
+                    
+                    im.windowWidth = @(curWW);
+                    im.windowLevel = @(curWL);
+                    if( [self isScaledFit] == NO)
+                        im.scale = @(scaleValue);
+                    else
+                        im.scale = nil;
+                    im.rotationAngle = @(rotation);
+                    im.yFlipped = @(yFlipped);
+                    im.xFlipped = @(yFlipped);
+                    im.xOffset = @(origin.x);
+                    im.yOffset = @(origin.y);
+                }
+            }
+        }
+    }
 }
 
 - (void) switchCopySettingsInSeries:(id) sender
@@ -2454,30 +2461,32 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
                     {
                         [pix changeWLWW :curWL :curWW];
                         
+                        DicomImage *im = pix.imageObj;
+                        
                         if( COPYSETTINGSINSERIES)
                         {
-                            [pix.imageObj setValue: nil forKey:@"windowWidth"];
-                            [pix.imageObj setValue: nil forKey:@"windowLevel"];
-                            [pix.imageObj setValue: nil forKey:@"scale"];
-                            [pix.imageObj setValue: nil forKey:@"rotationAngle"];
-                            [pix.imageObj setValue: nil forKey:@"yFlipped"];
-                            [pix.imageObj setValue: nil forKey:@"xFlipped"];
-                            [pix.imageObj setValue: nil forKey:@"xOffset"];
-                            [pix.imageObj setValue: nil forKey:@"yOffset"];
+                            im.windowWidth = nil;
+                            im.windowLevel = nil;
+                            im.scale = nil;
+                            im.rotationAngle = nil;
+                            im.yFlipped = nil;
+                            im.xFlipped = nil;
+                            im.xOffset = nil;
+                            im.yOffset = nil;
                         }
                         else
                         {
-                            [pix.imageObj setValue:[NSNumber numberWithFloat:curWW] forKey:@"windowWidth"];
-                            [pix.imageObj setValue:[NSNumber numberWithFloat:curWL] forKey:@"windowLevel"];
+                            im.windowWidth = @(curWW);
+                            im.windowLevel = @(curWL);
                             if( [self isScaledFit] == NO)
-                                [pix.imageObj setValue:[NSNumber numberWithFloat:scaleValue] forKey:@"scale"];
+                                im.scale = @(scaleValue);
                             else
-                                [pix.imageObj setValue:nil forKey:@"scale"];
-                            [pix.imageObj setValue:[NSNumber numberWithFloat:rotation] forKey:@"rotationAngle"];
-                            [pix.imageObj setValue:[NSNumber numberWithBool:yFlipped] forKey:@"yFlipped"];
-                            [pix.imageObj setValue:[NSNumber numberWithBool:yFlipped] forKey:@"xFlipped"];
-                            [pix.imageObj setValue:[NSNumber numberWithFloat:origin.x] forKey:@"xOffset"];
-                            [pix.imageObj setValue:[NSNumber numberWithFloat:origin.y] forKey:@"yOffset"];
+                                im.scale = nil;
+                            im.rotationAngle = @(rotation);
+                            im.yFlipped = @(yFlipped);
+                            im.xFlipped = @(yFlipped);
+                            im.xOffset = @(origin.x);
+                            im.yOffset = @(origin.y);
                         }
                     }
                 }
@@ -2492,23 +2501,33 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 
 - (void) setIndex:(short) index
 {
+    [self delete3DROIsAliases];
+    
 	[drawLock lock];
-	
+    
 	@try 
 	{
 		TextureComputed32bitPipeline = NO;
 		
-		BOOL	keepIt;
+		BOOL keepIt;
 		
 		[self stopROIEditing];
-		
-		[[self window] setAcceptsMouseMovedEvents: YES];
-
-		if( dcmPixList && index > -1 && [dcmPixList count] > 0)
+        
+        if( index >= (int) dcmPixList.count)
+            index = 0;
+        
+		if( dcmPixList && index >= 0 && index < [dcmPixList count] && [[dcmFilesList objectAtIndex: index] isDistant] == NO)
 		{
-			if( [[[[dcmFilesList objectAtIndex: 0] valueForKey:@"completePath"] lastPathComponent] isEqualToString:@"Empty.tif"]) noScale = YES;
-			else noScale = NO;
-				
+            BOOL isScaledFit = NO;
+			if( [[self.imageObj.completePath lastPathComponent] isEqualToString:@"Empty.tif"]) noScale = YES;
+			else
+            {
+                if( curImage >= 0 && COPYSETTINGSINSERIES)
+                    isScaledFit = self.isScaledFit;
+                
+                noScale = NO;
+            }
+            
 			curImage = index;
 			if( curImage >= [dcmPixList count]) curImage = (long)[dcmPixList count] -1;
 			if( curImage < 0) curImage = 0;
@@ -2529,8 +2548,9 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 			keepIt = NO;
 			for( ROI *r in curRoiList)
 			{
-				[r setRoiView :self];
-				[r recompute];
+                [r resetCache];
+                [r recompute];
+				r.curView = self;
 				if( curROI == r) keepIt = YES;
 			}
 			
@@ -2556,6 +2576,11 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 					
 					done = YES;
 				}
+                else
+                {
+                    if( isScaledFit)
+                        [self scaleToFit];
+                }
                 
                 [self.windowController willChangeValueForKey: @"thicknessInMm"];
                 [self.windowController didChangeValueForKey: @"thicknessInMm"];
@@ -2573,17 +2598,13 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 			[self loadTextures];
 			
 			[yearOld release];
-			
-			if( [[[dcmFilesList objectAtIndex: curImage] valueForKeyPath:@"series.study.yearOld"] isEqualToString: [[dcmFilesList objectAtIndex: curImage] valueForKeyPath:@"series.study.yearOldAcquisition"]])
-				yearOld = [[[dcmFilesList objectAtIndex: curImage] valueForKeyPath:@"series.study.yearOld"] retain];
-			else
-				yearOld = [[NSString stringWithFormat:@"%@ / %@", [[dcmFilesList objectAtIndex: curImage] valueForKeyPath:@"series.study.yearOld"], [[dcmFilesList objectAtIndex: curImage] valueForKeyPath:@"series.study.yearOldAcquisition"]] retain];
-		
+            yearOld = nil;
+            
 			[[NSNotificationCenter defaultCenter] postNotificationName:OsirixDCMViewIndexChangedNotification object:self];
 		}
 		else
 		{
-			[curDCM release];
+			[curDCM autorelease];
 			curDCM = nil;
 			curImage = -1;
 			[curRoiList autorelease];
@@ -2624,14 +2645,6 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 
 - (BOOL) containsScrollThroughModality
 {
-    for( NSString *m in [self.studyObj.modalities componentsSeparatedByString:@"\\"])
-    {
-        if( [[NSUserDefaults standardUserDefaults] boolForKey: [NSString stringWithFormat: @"scrollThroughSeriesFor%@", m]])
-        {
-            return YES;
-        }
-    }
-    
     return NO;
 }
 
@@ -2648,7 +2661,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
         
         if( imIndex < 0)
         {
-            NSArray *seriesArray = [[BrowserController currentBrowser] childrenArray: [self.seriesObj valueForKey: @"study"]];
+            NSArray *seriesArray = [[BrowserController currentBrowser] childrenArray: self.studyObj];
             NSInteger index = [seriesArray indexOfObject: self.seriesObj];
             
             if( index != NSNotFound)
@@ -2663,7 +2676,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
         }
         else if( imIndex >= [dcmPixList count])
         {
-            NSArray *seriesArray = [[BrowserController currentBrowser] childrenArray: [self.seriesObj valueForKey: @"study"]];
+            NSArray *seriesArray = [[BrowserController currentBrowser] childrenArray: self.studyObj];
             NSInteger index = [seriesArray indexOfObject: self.seriesObj];
             
             if( index != NSNotFound)
@@ -2714,62 +2727,36 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 		if( c == NSDeleteFunctionKey || c == NSDeleteCharacter || c == NSBackspaceCharacter || c == NSDeleteCharFunctionKey)
 		{
 			[[self windowController] addToUndoQueue:@"roi"];
-			
+        
 			// NE PAS OUBLIER DE CHANGER EGALEMENT LE CUT !
-			long	i;
-			NSTimeInterval groupID;
-			
+			NSTimeInterval groupID = 0;
+            NSMutableArray *roisToDelete = [NSMutableArray array];
 			[drawLock lock];
 			
-            
-            NSMutableArray *rArray = curRoiList;
-            
-            [rArray retain];
-            
 			@try
 			{
-				for( i = 0; i < [rArray count]; i++)
+				for( ROI *r in curRoiList)
 				{
-					ROI *r = [rArray objectAtIndex:i];
-					
 					if( [r ROImode] == ROI_selectedModify || [r ROImode] == ROI_drawing)
 					{
 						if( [r deleteSelectedPoint] == NO && r.locked == NO)
-						{
-							groupID = [r groupID];
-							[[NSNotificationCenter defaultCenter] postNotificationName: OsirixRemoveROINotification object:r userInfo: nil];
-							[rArray removeObjectAtIndex:i];
-							i--;
-							if( groupID != 0.0)
-								[self deleteROIGroupID:groupID];
-						}
+                            [roisToDelete addObject: r];
 					}
 				}
 				
-				for( i = 0; i < [rArray count]; i++)
+				for( ROI *r in curRoiList)
 				{
-					ROI *r = [rArray objectAtIndex:i];
-					
 					if( [r ROImode] == ROI_selected  && r.locked == NO && r.hidden == NO)
-					{
-						groupID = [r groupID];
-						[[NSNotificationCenter defaultCenter] postNotificationName: OsirixRemoveROINotification object:r userInfo: nil];
-						[rArray removeObjectAtIndex:i];
-						i--;
-						if( groupID != 0.0)
-							[self deleteROIGroupID:groupID];
-					}
+						[roisToDelete addObject: r];
 				}
-				
-				[[NSNotificationCenter defaultCenter] postNotificationName: OsirixROIRemovedFromArrayNotification object: nil userInfo: nil];
 			}
 			@catch (NSException * e) 
 			{
                 N2LogExceptionWithStackTrace(e);
 			}
             
-            [rArray autorelease];
-			
+            [ROI deleteROIs: roisToDelete];
+            
 			[drawLock unlock];
 			
 			[self setNeedsDisplay: YES];
@@ -2843,7 +2830,8 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
         }
         else if (c == NSUpArrowFunctionKey)
         {
-			if( [self is2DViewer] == YES && [[self windowController] maxMovieIndex] > 1) [super keyDown:event];
+			if( [self is2DViewer] == YES && [[self windowController] maxMovieIndex] > 1)
+                [self.windowController keyDown:event];
 			else
 			{
 				[self setScaleValue:(scaleValue+1./50.)];
@@ -2853,7 +2841,8 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
         }
         else if(c == NSDownArrowFunctionKey)
         {
-            if( [[self windowController] maxMovieIndex] > 1 && [[self windowController] maxMovieIndex] > 1) [super keyDown:event];
+            if( [[self windowController] maxMovieIndex] > 1 && [[self windowController] maxMovieIndex] > 1)
+                [self.windowController keyDown:event];
 			else
 			{
 				self.scaleValue = scaleValue -1.0f/50.0f;
@@ -3017,46 +3006,6 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
     }
 }
 
-- (BOOL) shouldPropagate
-{	
-//	if( curImage >= 0 && [DCMView noPropagateSettingsInSeriesForModality: [[dcmFilesList objectAtIndex:0] valueForKey:@"modality"]] || COPYSETTINGSINSERIES == NO)
-//		return NO;
-//	else
-	return YES;
-}
-
-- (void)deleteROIGroupID:(NSTimeInterval)groupID
-{
-	[drawLock lock];
-	
-    NSMutableArray *rArray = curRoiList;
-    
-    [rArray retain];
-    
-	@try 
-	{
-		for( int i=0; i<[rArray count]; i++ )
-		{
-			if([[rArray objectAtIndex:i] groupID] == groupID)
-			{
-				[[NSNotificationCenter defaultCenter] postNotificationName:OsirixRemoveROINotification object:[rArray objectAtIndex:i] userInfo:nil];
-				[rArray removeObjectAtIndex:i];
-				i--;
-                
-                [[NSNotificationCenter defaultCenter] postNotificationName:OsirixROIRemovedFromArrayNotification object:NULL userInfo:NULL];
-			}
-		}
-	}
-	@catch (NSException * e) 
-	{
-		N2LogExceptionWithStackTrace(e);
-	}
-    
-    [rArray autorelease];
-	
-	[drawLock unlock];
-}
-
 - (BOOL) allIdenticalValues:(NSString*) v inArray:(NSArray*) a
 {
 	if( [a count])
@@ -3078,8 +3027,8 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	
 	@try 
 	{
-		id curSeries = self.seriesObj;
-		id curStudy = [curSeries valueForKey:@"study"];
+		DicomSeries *curSeries = self.seriesObj;
+		DicomStudy *curStudy = self.studyObj;
 		
 		NSArray *viewers = [[ViewerController getDisplayed2DViewers] sortedArrayUsingFunction: studyCompare context: nil];
 		
@@ -3099,33 +3048,31 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 		// same patients?
 		if( [self allIdenticalValues: @"name" inArray: studiesArray] == NO)
 		{
-			if( [curStudy valueForKey: @"name"])
+			if( curStudy.name)
 			{
 				if( [description length]) [description appendString:@"\r"];
-				if( [curStudy valueForKey: @"name"]) [description appendString: [curStudy valueForKey: @"name"]];
+				if( curStudy.name) [description appendString: curStudy.name];
 			}
 		}
 		
 		if( [description length]) [description appendString:@"\r"];
 		
-		if( [NSUserDefaults formatDateTime: [curSeries valueForKey:@"date"]])
-			[description appendString: [NSUserDefaults formatDateTime: [curSeries valueForKey:@"date"]]];
+		if( [NSUserDefaults formatDateTime: curSeries.date])
+			[description appendString: [NSUserDefaults formatDateTime: curSeries.date]];
 		
 		if( [self allIdenticalValues: @"studyName" inArray: studiesArray] == NO)
 		{
-			if( [curStudy valueForKey: @"studyName"])
+			if( curStudy.studyName)
 			{
 				if( [description length]) [description appendString:@"\r"];
-				if( [curStudy valueForKey: @"studyName"])
-					[description appendString: [curStudy valueForKey: @"studyName"]];
+                [description appendString: curStudy.studyName];
 			}
 		}
 
-		if( [curSeries valueForKey:@"name"])
+		if( curSeries.name)
 		{
 			if( [description length]) [description appendString:@"\r"];
-			if( [curSeries valueForKey:@"name"])
-				[description appendString: [curSeries valueForKey:@"name"]];
+            [description appendString: curSeries.name];
 		}
 		
 		NSMutableDictionary *stanStringAttrib = [NSMutableDictionary dictionary];
@@ -3229,10 +3176,13 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	
 	if( [self roiTool: currentTool])
 	{
-		NSPoint tempPt = [self convertPoint: [event locationInWindow] fromView: nil];
-		tempPt = [self ConvertFromNSView2GL:tempPt];
-		if( [self clickInROI: tempPt])
-            roiHit = YES;
+        if( [NSEvent pressedMouseButtons] == 0)
+        {
+            NSPoint tempPt = [self convertPoint: event.locationInWindow fromView: nil];
+            tempPt = [self ConvertFromNSView2GL:tempPt];
+            if( [self clickInROI: tempPt])
+                roiHit = YES;
+        }
 	}
 	else if( ( [event modifierFlags] & NSShiftKeyMask) && !([event modifierFlags] & NSAlternateKeyMask)  && !([event modifierFlags] & NSCommandKeyMask)  && !([event modifierFlags] & NSControlKeyMask) && mouseDragging == NO)
 	{
@@ -3240,7 +3190,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 		{
 			[self computeMagnifyLens: NSMakePoint( mouseXPos, mouseYPos)];
 #ifdef new_loupe
-			[self displayLoupeWithCenter:NSMakePoint([[self window] frame].origin.x+[event locationInWindow].x, [[self window] frame].origin.y+[event locationInWindow].y)];
+			[self displayLoupeWithCenter:NSMakePoint([[self window] frame].origin.x+event.locationInWindow.x, [[self window] frame].origin.y+event.locationInWindow.y)];
 #endif
 		}
 	}
@@ -3302,7 +3252,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 				[matrix selectCellAtRow :curImage/cols column:curImage%cols];
 			}
 			
-			ToolMode tool = currentMouseEventTool;
+			long tool = currentMouseEventTool;
 			
 			if( crossMove >= 0) tool = tCross;
 			
@@ -3319,14 +3269,15 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 			
 			if( [self roiTool: tool] )
 			{
-				NSPoint     eventLocation = [event locationInWindow];
+				NSPoint     eventLocation = event.locationInWindow;
 				NSPoint		tempPt = [self convertPoint:eventLocation fromView: nil];
 				
 				tempPt = [self ConvertFromNSView2GL:tempPt];
 				
 				for( ROI *r in curRoiList)
 				{
-					[r mouseRoiUp: tempPt scaleValue: (float) scaleValue];
+                    if( r.ROImode != ROI_sleep)
+                        [r mouseRoiUp: tempPt scaleValue: (float) scaleValue];
 					
 					if( [r ROImode] == ROI_selected)
 					{
@@ -3388,21 +3339,21 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
     }
 }
 
--(void) roiSet:(ROI*) aRoi
+-(void) roiSet:(ROI*) aRoi __deprecated
 {
-	[aRoi setRoiView :self];
+	aRoi.curView = self;
 }
 
 -(void) roiSet
 {
 	for( ROI *c in curRoiList)
-		[c setRoiView :self];
+		c.curView = self;
 }
 
 // checks to see if tool is a valid ID for ROIs
 // A better name might be  - (BOOL)isToolforROIs:(long)tool;
 
--(BOOL) roiTool:(ToolMode) tool
+-(BOOL) roiTool:(long) tool
 {
 	switch( tool)
 	{
@@ -3420,8 +3371,10 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 		case tPlain:
 		case t2DPoint:
         case tTAGT:
+        case tBall:
+        case tOvalAngle:
 			return YES;
-		default:;
+		break;
 	}
 	
 	return NO;
@@ -3470,6 +3423,8 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	
 	LENSSIZE = 100 / scaleValue;
 	
+    LENSSIZE *= self.window.backingScaleFactor;
+    
 	[self deleteLens];
 	
 	char *src = [curDCM baseAddr];
@@ -3591,13 +3546,13 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 			// Apply the circle
 			{
 				int		x,y;
-				int		xsqr;
+//				int		xsqr;
 				int		rad = LENSSIZE/2;
 				
 				x = rad;
 				while( x-- > 0)
 				{
-					xsqr = x*x;
+//					xsqr = x*x;
 					y = rad;
 					while( y-- > 0)
 					{
@@ -3644,6 +3599,8 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
         
         glTexImage2D(GL_TEXTURE_RECTANGLE_EXT, 0, ([bitmap samplesPerPixel]==4)?GL_RGBA:GL_RGB, imageSize.width, imageSize.height, 0, ([bitmap samplesPerPixel]==4)?GL_RGBA:GL_RGB, GL_UNSIGNED_BYTE, buffer);
 	}
+    else
+        free( buffer);
     
 	[bitmap release];
 }
@@ -3659,33 +3616,21 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
         
         [BrowserController updateActivity];
         
-        float	cpixelMouseValueR = pixelMouseValueR;
-        float	cpixelMouseValueG = pixelMouseValueG;
-        float	cpixelMouseValueB = pixelMouseValueB;
-        float	cmouseXPos = mouseXPos;
-        float	cmouseYPos = mouseYPos;
+        float	cpixelMouseValueR = pixelMouseValueR, cpixelMouseValueG = pixelMouseValueG, cpixelMouseValueB = pixelMouseValueB;
+        float	cmouseXPos = mouseXPos, cmouseYPos = mouseYPos;
         float	cpixelMouseValue = pixelMouseValue;
         
-        pixelMouseValueR = 0;
-        pixelMouseValueG = 0;
-        pixelMouseValueB = 0;
-        mouseXPos = 0;
-        mouseYPos = 0;
+        pixelMouseValueR = pixelMouseValueG = pixelMouseValueB = 0;
+        mouseXPos = mouseYPos = 0;
         pixelMouseValue = 0;
         
-        float	cblendingMouseXPos = blendingMouseXPos;
-        float	cblendingMouseYPos = blendingMouseYPos;
+        float	cblendingMouseXPos = blendingMouseXPos, cblendingMouseYPos = blendingMouseYPos;
         float	cblendingPixelMouseValue = blendingPixelMouseValue;
-        float	cblendingPixelMouseValueR = blendingPixelMouseValueR;
-        float	cblendingPixelMouseValueG = blendingPixelMouseValueG;
-        float	cblendingPixelMouseValueB = blendingPixelMouseValueB;
+        float	cblendingPixelMouseValueR = blendingPixelMouseValueR, cblendingPixelMouseValueG = blendingPixelMouseValueG, cblendingPixelMouseValueB = blendingPixelMouseValueB;
         
-        blendingMouseXPos = 0;
-        blendingMouseYPos = 0;
+        blendingMouseXPos = blendingMouseYPos = 0;
         blendingPixelMouseValue = 0;
-        blendingPixelMouseValueR = 0;
-        blendingPixelMouseValueG = 0;
-        blendingPixelMouseValueB = 0;
+        blendingPixelMouseValueR = blendingPixelMouseValueG = blendingPixelMouseValueB = 0;
         
         BOOL needUpdate = NO;
         
@@ -3695,12 +3640,12 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
         {
             [[self openGLContext] makeCurrentContext];	// Important for iChat compatibility
             
-            BOOL mouseOnImage = NO;
-            
             NSPoint imageLocation = [self ConvertFromNSView2GL: eventLocationInView];
             
             mouseXPos = imageLocation.x;
             mouseYPos = imageLocation.y;
+            
+            mouseOnImage = NO;
             
             if( imageLocation.x >= 0 && imageLocation.x < curDCM.pwidth)	//&& NSPointInRect( eventLocation, size)) <- this doesn't work in MPR Ortho
             {
@@ -3709,23 +3654,20 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
                     mouseOnImage = YES;
                     
                     if( (modifierFlags & NSShiftKeyMask) && (modifierFlags & NSControlKeyMask) && mouseDragging == NO)
-                    {
                         [self sync3DPosition];
-                    }
+                    
                     else if( (modifierFlags & (NSShiftKeyMask|NSCommandKeyMask|NSControlKeyMask|NSAlternateKeyMask)) == NSShiftKeyMask && mouseDragging == NO)
                     {
                         if( [self roiTool: currentTool] == NO)
                         {
                             [self computeMagnifyLens: imageLocation];
 #ifdef new_loupe
-                            [self displayLoupeWithCenter:NSMakePoint([[self window] frame].origin.x+[theEvent locationInWindow].x, [[self window] frame].origin.y+[theEvent locationInWindow].y)];
+                            [self displayLoupeWithCenter:NSMakePoint([[self window] frame].origin.x+theEvent.locationInWindow.x, [[self window] frame].origin.y+theEvent.locationInWindow.y)];
 #endif
                         }
                     }
                     
-                    int
-                    xPos = (int)mouseXPos,
-                    yPos = (int)mouseYPos;
+                    int xPos = (int)mouseXPos, yPos = (int)mouseYPos;
                     
                     if( curDCM.isRGB )
                     {
@@ -3733,9 +3675,85 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
                         pixelMouseValueG = ((unsigned char*) curDCM.fImage)[ 4 * (xPos + yPos * curDCM.pwidth) +2];
                         pixelMouseValueB = ((unsigned char*) curDCM.fImage)[ 4 * (xPos + yPos * curDCM.pwidth) +3];
                     }
-                    else pixelMouseValue = [curDCM getPixelValueX: xPos Y:yPos];
+                    else
+                        pixelMouseValue = [curDCM getPixelValueX: xPos Y:yPos];
+                    
+                    if(	cmouseXPos != mouseXPos || cmouseYPos != mouseYPos)
+                    {
+                        self.mousePosUSRegion = nil;
+                        if( curDCM.hasUSRegions)
+                        {
+                            BOOL roiInsideAnUsRegion = FALSE;
+                            int regionSpatialFormat = 0;
+                            regionCode physicalUnitsXDirection = regionCode_None, physicalUnitsYDirection = regionCode_None;
+                            double physicalDeltaX = 0.0, physicalDeltaY = 0.0;
+                            
+                            for( DCMUSRegion *usR in curDCM.usRegions)
+                            {
+                                roiInsideAnUsRegion = ((xPos <= usR.regionLocationMaxX1 && xPos >= usR.regionLocationMinX0) && (yPos <= usR.regionLocationMaxY1 && yPos >= usR.regionLocationMinY0));
+                                    
+                                if (roiInsideAnUsRegion)
+                                {
+                                    regionSpatialFormat = [usR regionSpatialFormat];
+                                    physicalUnitsXDirection = [usR physicalUnitsXDirection];
+                                    physicalUnitsYDirection = [usR physicalUnitsYDirection];
+                                    physicalDeltaX = [usR physicalDeltaX];
+                                    physicalDeltaY = [usR physicalDeltaY];
+                                    
+                                    if ((regionSpatialFormat == 0) && (physicalUnitsXDirection == 0) && (physicalUnitsYDirection == 0))
+                                    {
+                                        // RSF=none, PUXD=none, PUYD=none
+                                        roiInsideAnUsRegion = FALSE;
+                                    }
+                                    else
+                                    {
+                                        static NSArray * physicalUnitsXYDirection = nil;
+                                        
+                                        if( physicalUnitsXYDirection == nil)
+                                            physicalUnitsXYDirection = [[NSArray arrayWithObjects: NSLocalizedString( @"none", nil), @"%", NSLocalizedString( @"dB", @"decibel"), NSLocalizedString( @"cm", nil), NSLocalizedString( @"sec", @"second"), NSLocalizedString( @"hertz", nil), NSLocalizedString( @"dB/sec", @"decibel per second"), NSLocalizedString( @"cm/sec", nil), NSLocalizedString( @"cm\u00B2", @"cm2"), NSLocalizedString( @"cm\u00B2/sec", @"cm2/sec"), NSLocalizedString( @"cm\u00B3", @"cm3"), NSLocalizedString( @"cm\u00B3/sec", @"cm3/sec"), @"\u00B0", nil] retain];
+                                        
+                                        NSString * unitsX = nil, * unitsY = nil;
+                                        
+                                        if (physicalUnitsXDirection > 12)
+                                            unitsX = NSLocalizedString( @"unknown", nil);
+                                        
+                                        else if (physicalUnitsYDirection > 12)
+                                            unitsY = NSLocalizedString( @"unknown", nil);
+                                        
+                                        else
+                                        {
+                                            unitsX = [physicalUnitsXYDirection objectAtIndex:physicalUnitsXDirection];
+                                            unitsY = [physicalUnitsXYDirection objectAtIndex:physicalUnitsYDirection];
+                                        }
+                                        
+                                        float xOrigin = (mouseXPos - usR.regionLocationMinX0 - usR.referencePixelX0);
+                                        float yOrigin = - (mouseYPos - usR.regionLocationMinY0 - usR.referencePixelY0);
+                                        
+                                        if( usR.regionSpatialFormat == 2)
+                                            yOrigin = -yOrigin;
+                                        
+                                        xOrigin *= fabs( physicalDeltaX);
+                                        yOrigin *= fabs( physicalDeltaY);
+                                        
+                                        if( physicalUnitsYDirection == regionCode_cmsec && yOrigin >= 100.0)
+                                        {
+                                            unitsY = NSLocalizedString( @"m/sec", nil);
+                                            yOrigin /= 100.0;
+                                        }
+                                        
+                                        if( usR.isReferencePixelY0Present && usR.isReferencePixelX0Present)
+                                            self.mousePosUSRegion = [NSString stringWithFormat: @"X: %0.3f %@ Y: %0.3f %@", xOrigin, unitsX, yOrigin, unitsY];
+                                        
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
+            
+            blendingMouseOnImage = NO;
             
             // Blended view
             if( blendingView)
@@ -3748,6 +3766,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
                     {
                         blendingMouseXPos = blendedLocation.x;
                         blendingMouseYPos = blendedLocation.y;
+                        blendingMouseOnImage = YES;
                         
                         int xPos = (int)blendingMouseXPos,
                         yPos = (int)blendingMouseYPos;
@@ -3822,11 +3841,11 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
         
         [drawLock unlock];
         
-        if(	cpixelMouseValueR != pixelMouseValueR)	needUpdate = YES;
-        if(	cpixelMouseValueG != pixelMouseValueG)	needUpdate = YES;
-        if(	cpixelMouseValueB != pixelMouseValueB)	needUpdate = YES;
-        if(	cmouseXPos != mouseXPos)	needUpdate = YES;
-        if(	cmouseYPos != mouseYPos)	needUpdate = YES;
+        if(	cpixelMouseValueR != pixelMouseValueR) needUpdate = YES;
+        if(	cpixelMouseValueG != pixelMouseValueG) needUpdate = YES;
+        if(	cpixelMouseValueB != pixelMouseValueB) needUpdate = YES;
+        if(	cmouseXPos != mouseXPos) needUpdate = YES;
+        if(	cmouseYPos != mouseYPos) needUpdate = YES;
         if(	cpixelMouseValue != pixelMouseValue)	needUpdate = YES;
         if( cblendingMouseXPos != blendingMouseXPos) needUpdate = YES;
         if( cblendingMouseYPos != blendingMouseYPos) needUpdate = YES;
@@ -3884,7 +3903,9 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 
 -(void) mouseMoved: (NSEvent*) theEvent
 {
-    if( CGCursorIsVisible() == NO && lensTexture == nil) return; //For Synergy compatibility
+    if( CGCursorIsVisible() == NO && lensTexture == nil)
+        return; //For Synergy compatibility
+    
 	if( ![[self window] isVisible])
 	{
 		if( [self is2DViewer] && [[self windowController] FullScreenON])
@@ -3895,33 +3916,51 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 			return;
 	}
 	
-	if ([self eventToPlugins:theEvent]) return;
+	if ([self eventToPlugins:theEvent])
+        return;
 	
-	if( !drawing) return;
+	if( !drawing)
+        return;
 	
 	if( [self is2DViewer] == YES)
 	{
-		if( [[self windowController] windowWillClose]) return;
+		if( [[self windowController] windowWillClose])
+            return;
 	}
 	
-	if( curDCM == nil) return;
+	if( curDCM == nil)
+        return;
 	
-	if( dcmPixList == nil) return;
+	if( dcmPixList == nil)
+        return;
 	
 	if( avoidMouseMovedRecursive)
 		return;
 	
 	avoidMouseMovedRecursive = YES;
 	
-    NSPoint eventLocation = [[self window] mouseLocationOutsideOfEventStream];
+    NSPoint eventLocation = [self.window mouseLocationOutsideOfEventStream];
     
     if( [[self window] isVisible])
     {
+        BOOL mouseOnViewCopy = mouseOnView;
+        
         id view = [self.window.contentView hitTest: eventLocation];
         
+        mouseOnView = NO;
+        
         if( [view isKindOfClass: [DCMView class]])
-            [view mouseMovedInView: eventLocation];
-            
+        {
+            if( self == view)
+            {
+                mouseOnView = YES;
+                [self mouseMovedInView: eventLocation];
+            }
+        }
+        
+        if( mouseOnView != mouseOnViewCopy)
+            [self setNeedsDisplay: YES];
+        
 		if ([self is2DViewer] == YES && [self.window isKeyWindow])
 			[[self windowController] autoHideMatrix];
 	}
@@ -3933,8 +3972,10 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 {
 	ToolMode tool;
 	
-	if( [event type] == NSRightMouseDown || [event type] == NSRightMouseDragged) tool = currentToolRight;
-	else if( [event type] == NSOtherMouseDown || [event type] == NSOtherMouseDragged) tool = tTranslate;
+	if( [event type] == NSRightMouseDown || [event type] == NSRightMouseDragged)
+        tool = currentToolRight;
+	else if( [event type] == NSOtherMouseDown || [event type] == NSOtherMouseDragged || trackPadNumberOfFingers == 3)
+        tool = tTranslate;
 	else tool = currentTool;
 	
 	if (([event modifierFlags] & NSCommandKeyMask))  tool = tTranslate;
@@ -3973,22 +4014,45 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	bdstartMax = [[blendingView curDCM] wl] + [[blendingView curDCM] ww]/2;
 }
 
+- (ROI*) clickInROI: (NSPoint) tempPt testTextBox: (BOOL) t
+{
+    for( ROI * r in curRoiList)
+    {
+        if([r clickInROI:tempPt :curDCM.pwidth/2. :curDCM.pheight/2. :scaleValue :t])
+            return r;
+    }
+    
+    return nil;
+}
+
 - (ROI*) clickInROI: (NSPoint) tempPt
 {
-	for( ROI * r in curRoiList)
-	{
-		if([r clickInROI:tempPt :curDCM.pwidth/2. :curDCM.pheight/2. :scaleValue :NO])
-			return r;
-	}
-	
-	return nil;
+    return [self clickInROI: tempPt testTextBox:NO];
+}
+
+- (DCMPix*) middleSliceInThickStack
+{
+    if( curDCM.stack > 1)
+    {
+        int maxVal;
+        
+        if( flippedData) maxVal = curImage-(curDCM.stack-1)/2;
+        else maxVal = curImage+(curDCM.stack-1)/2;
+        
+        if( maxVal < 0) maxVal = 0;
+        if( maxVal >= [dcmPixList count]) maxVal = (long)[dcmPixList count]-1;
+        
+        return [dcmPixList objectAtIndex: maxVal];
+    }
+    
+    return curDCM;
 }
 
 - (void) sync3DPosition
 {
 	float location[ 3];
 	
-	[curDCM convertPixX: mouseXPos pixY: mouseYPos toDICOMCoords: location pixelCenter: YES];
+	[curDCM convertPixX: mouseXPos pixY: mouseYPos toDICOMCoords: location pixelCenter: NO];
 	
 	DCMPix	*thickDCM;
 
@@ -4010,8 +4074,8 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	[instructions setObject: [NSNumber numberWithLong: pos] forKey: @"Pos"];
 	[instructions setObject: [NSNumber numberWithFloat:[(DCMPix*)[dcmPixList objectAtIndex:curImage] sliceLocation]] forKey: @"Location"];
 
-	if( [[dcmFilesList objectAtIndex: curImage] valueForKeyPath:@"series.study.studyInstanceUID"])
-		[instructions setObject: [[dcmFilesList objectAtIndex: curImage] valueForKeyPath:@"series.study.studyInstanceUID"] forKey: @"studyID"];
+	if( self.studyObj.studyInstanceUID)
+		[instructions setObject: self.studyObj.studyInstanceUID forKey: @"studyID"];
 
 	if( curDCM)
 		[instructions setObject: curDCM forKey: @"DCMPix"];
@@ -4032,55 +4096,68 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 
 // TrackPad support
 
-//- (void)touchesBeganWithEvent:(NSEvent *)event
-//{
-//    NSSet *touches = [event touchesMatchingPhase: NSTouchPhaseTouching inView: self];
-//    
-//    if (touches.count == 2)
-//	{
-//		NSPoint initialPoint = [self convertPointFromBase: [event locationInWindow]];
-//        NSArray *array = [touches allObjects];
-//        
-//		NSLog( @"%@", array);
-//    }
-//	else if (touches.count == 3)
-//	{
-//		
-//    }
-//}
-//
-//- (void)touchesMovedWithEvent:(NSEvent *)event
-//{
-//    self.modifiers = [event modifierFlags];
-//    NSSet *touches = [event touchesMatchingPhase:NSTouchPhaseTouching inView: self];
-//    
-//    if (touches.count == 2 && _initialTouches[0])
-//	{
-//        NSArray *array = [touches allObjects];
-//		
-//        NSLog( @"%@", array);
-//    }
-//}
-//
-//- (void)touchesEndedWithEvent:(NSEvent *)event
-//{
-//
-//}
-//
-//- (void)touchesCancelledWithEvent:(NSEvent *)event
-//{
-//	
-//}
+- (void)touchesBeganWithEvent:(NSEvent *)event
+{
+    NSSet *touches = [event touchesMatchingPhase: NSTouchPhaseTouching inView: self];
+    
+//    NSLog( @"%d touches", touches.count);
+    
+    trackPadNumberOfFingers = touches.count;
+    trackPadScaleAccumulator = 0;
+    trackPadMoved = NO;
+    
+    if( trackPadNumberOfFingers > 1)
+    {
+        startScaleValue = scaleValue;
+        originStart = origin;
+        start = previous = [self convertPoint: event.locationInWindow fromView: nil];
+    }
+    
+    [super touchesBeganWithEvent: event];
+}
+
+- (void)touchesMovedWithEvent:(NSEvent *)event
+{
+    NSSet *touches = [event touchesMatchingPhase: NSTouchPhaseTouching inView: self];
+    
+    trackPadNumberOfFingers = touches.count;
+    
+    [super touchesMovedWithEvent: event];
+}
+
+- (void)touchesEndedWithEvent:(NSEvent *)event
+{
+    trackPadNumberOfFingers = 1;
+    trackPadMoved = NO;
+    
+    [super touchesEndedWithEvent: event];
+}
+
+- (void)touchesCancelledWithEvent:(NSEvent *)event
+{
+    trackPadNumberOfFingers = 1;
+    trackPadMoved = NO;
+    
+    [super touchesEndedWithEvent: event];
+}
 
 -(void) magnifyWithEvent:(NSEvent *)anEvent
 {
-	[self setScaleValue: scaleValue + anEvent.deltaZ / 60.];
+    if( ![self is2DViewer])
+        return;
+    
+    trackPadScaleAccumulator += anEvent.magnification * 80.;
+    
+    [self mouseSetScale: trackPadScaleAccumulator mouseClickCenteredSupport: NO];
 	
 	[self setNeedsDisplay:YES];
 }
 
 -(void) rotateWithEvent:(NSEvent *)anEvent
 {
+    if( ![self is2DViewer])
+        return;
+    
 	[self setRotation: rotation - anEvent.rotation * 1.5];
 	
 	[self setNeedsDisplay:YES];
@@ -4104,37 +4181,37 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 		if( anEvent.deltaY > 0.5)
 			[v loadSeriesDown];
 	}
+    
+    //NSArray *touches = [event touchesMatchingPhase:NSTouchPhaseTouching inView:self];
+    //if (touches.count == 4) {
 }
 
-- (void) deleteInvalidROIsForArray: (NSMutableArray*) r
+- (void) deleteInvalidROIsForArray: (NSMutableArray*) array
 {
-    [r retain]; //OsirixRemoveROINotification or OsirixROIRemovedFromArrayNotification can change/delete the NSArray !
+    NSMutableArray *roisToDelete = [NSMutableArray array];
     
-    @try {
-        for( int i = 0; i < [r count]; i++)
+    @try
+    {
+        for( ROI *r in array)
         {
-            if( [[r objectAtIndex: i] valid] == NO)
+            if( [r valid] == NO)
             {
-                if( curROI == [r objectAtIndex: i])
+                if( curROI == r)
                 {
                     [curROI autorelease];
                     curROI = nil;
                     drawingROI = NO;
                 }
                 
-                [[NSNotificationCenter defaultCenter] postNotificationName: OsirixRemoveROINotification object: [r objectAtIndex: i] userInfo: nil];
-                [r removeObjectAtIndex: i];
-                i--;
-                
-                [[NSNotificationCenter defaultCenter] postNotificationName:OsirixROIRemovedFromArrayNotification object:NULL userInfo:NULL];
+                [roisToDelete addObject: r];
             }
         }
+        
+        [ROI deleteROIs: roisToDelete];
     }
     @catch (NSException *exception) {
         N2LogException( exception);
     }
-    
-    [r autorelease];
 }
 
 - (void) deleteInvalidROIs
@@ -4150,6 +4227,21 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 
 - (void) mouseDown:(NSEvent *)event
 {
+    if( warningNotice && ([self class] == [DCMView class]))
+    {
+        float sf = [self.window backingScaleFactor]; //retina
+        
+        NSPoint tempPt = [[[event window] contentView] convertPoint: event.locationInWindow toView:self];
+        
+        tempPt = [self convertPointToBacking: tempPt]; //retina
+        tempPt.y = [self drawingFrameRect].size.height - tempPt.y ;		// inverse Y scaling system
+        
+        NSRect r = NSMakeRect( drawingFrameRect.size.width/2 - [self convertSizeToBacking: [warningNotice frameSize]].width/2, drawingFrameRect.size.height - 35*sf - [self convertSizeToBacking: [warningNotice frameSize]].height, [self convertSizeToBacking: [warningNotice frameSize]].width, [self convertSizeToBacking: [warningNotice frameSize]].height);
+        
+        if( NSPointInRect( tempPt, r))
+            [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:@"http://pixmeo.pixmeo.com/products.html#OsiriXMD"]];
+    }
+    
     if( CGCursorIsVisible() == NO && lensTexture == nil) return; //For Synergy compatibility
 	if ([self eventToPlugins:event]) return;
 	
@@ -4168,10 +4260,10 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	{
 		if( ([event modifierFlags] & NSShiftKeyMask) == 0 && ([event modifierFlags] & NSControlKeyMask) == 0 && ([event modifierFlags] & NSAlternateKeyMask) == 0 && ([event modifierFlags] & NSCommandKeyMask) == 0)
 		{
-			NSPoint tempPt = [[[event window] contentView] convertPoint: [event locationInWindow] toView:self];
+			NSPoint tempPt = [[[event window] contentView] convertPoint: event.locationInWindow toView:self];
 			tempPt = [self ConvertFromNSView2GL:tempPt];
 			
-			NSMutableDictionary	*dict = [NSMutableDictionary dictionaryWithObjectsAndKeys: [NSNumber numberWithFloat:tempPt.y], @"Y", [NSNumber numberWithLong:tempPt.x],@"X", [NSNumber numberWithBool: NO], @"stopMouseDown", nil];
+			NSMutableDictionary	*dict = [NSMutableDictionary dictionaryWithObjectsAndKeys: [NSNumber numberWithFloat:tempPt.y], @"Y", [NSNumber numberWithLong:tempPt.x],@"X", @NO, @"stopMouseDown", nil];
 			[[NSNotificationCenter defaultCenter] postNotificationName: OsirixMouseDownNotification object: [self windowController] userInfo: dict];
 			
 			if( [[dict valueForKey:@"stopMouseDown"] boolValue]) return;
@@ -4195,7 +4287,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 			[self erase2DPointMarker];
 			if( blendingView) [blendingView erase2DPointMarker];
 			
-			NSPoint     eventLocation = [event locationInWindow];
+			NSPoint     eventLocation = event.locationInWindow;
 			NSRect      size = [self frame];
 			ToolMode	tool;
 			
@@ -4209,7 +4301,9 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 			{
 				NSPoint tempPt = [self convertPoint:eventLocation fromView: nil];
 				tempPt = [self ConvertFromNSView2GL:tempPt];
-				if( [self clickInROI: tempPt]) roiHit = YES;
+                
+				if( [self clickInROI: tempPt testTextBox: YES])
+                    roiHit = YES;
 			}
 			
 			if( roiHit == NO)
@@ -4259,7 +4353,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 			{
                 return;
 			}
-			else if( clickCount == 2 && roiHit == NO && stringID == nil && [self actionForHotKey: @"dbl-click"])
+			else if( clickCount == 2 && roiHit == NO && stringID == nil && curROI == nil && [self actionForHotKey: @"dbl-click"])
 			{
                 return;
 			}
@@ -4268,7 +4362,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 			
 			if( tool == tRotate)
 			{
-				NSPoint current = [self currentPointInView:event];
+				NSPoint current = [self convertPoint: event.locationInWindow fromView: nil];
 		
 				current.x -= [self frame].size.width/2.;
 				current.y -= [self frame].size.height/2.;
@@ -4347,16 +4441,13 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 					}
 					
 					NSMutableArray *points;
-					for( int i = 0; i < [roiArray count]; i++ )
+					for( ROI *r in roiArray)
 					{
-						ROI *r = [roiArray objectAtIndex: i];
 						if( r.type != tPlain && r.type != tArrow && r.type != tAngle && r.type != tAxis && r.type != tDynAngle && r.type != tTAGT)
 						{
-							points = [r points];
-																																					  
-							for( int j = 0; j < [points count]; j++ )
+							for( MyPoint *point in [r points])
 							{
-								NSPoint pt = [[points objectAtIndex:j] point];
+								NSPoint pt = [point point];
 								float dx = (pt.x-tempPt.x);
 								float dx2 = dx * dx;
 								float dy = (pt.y-tempPt.y) *pixSpacingRatio;
@@ -4367,7 +4458,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 						}
 					}
 					repulsorRadius = (int) ((distance + 0.5) * 0.8);
-					if(repulsorRadius < 2) repulsorRadius = 2;
+					if(repulsorRadius < 1) repulsorRadius = 1;
 					if(repulsorRadius>curDCM.pwidth/2) repulsorRadius = curDCM.pwidth/2;
 					
 					if( [roiArray count] == 0 || distance == 0)
@@ -4432,7 +4523,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 			}
 			
 			// ROI TOOLS
-			if( [self roiTool:tool] == YES && crossMove == -1 )
+			if( [self roiTool:tool] == YES && crossMove == -1)
 			{
                 mouseDraggedForROIUndo = NO;
                 
@@ -4445,8 +4536,8 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 				{
 					[self deleteMouseDownTimer];
 					
-					BOOL		DoNothing = NO;
-					NSInteger	selected = -1;
+					BOOL DoNothing = NO;
+					NSInteger selected = -1;
 					NSPoint tempPt = [self convertPoint:eventLocation fromView: nil];
 					tempPt = [self ConvertFromNSView2GL:tempPt];
 					
@@ -4458,7 +4549,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 					
 					BOOL roiFound = NO;
 					
-					if (!(([event modifierFlags] & NSCommandKeyMask) && ([event modifierFlags] & NSShiftKeyMask)))
+					if( !(([event modifierFlags] & NSCommandKeyMask) && ([event modifierFlags] & NSShiftKeyMask)))
 					{
 						for( ROI *r in curRoiList)
 						{
@@ -4487,25 +4578,30 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 						}
 					}
 							
-					if (([event modifierFlags] & NSShiftKeyMask) && !([event modifierFlags] & NSCommandKeyMask) )
+					if( ([event modifierFlags] & NSShiftKeyMask) && !([event modifierFlags] & NSCommandKeyMask))
 					{
-						if( selected != -1 )
+						if( selected != -1)
 						{
 							if( [[curRoiList objectAtIndex: selected] ROImode] == ROI_selected)
 							{
 								[[curRoiList objectAtIndex: selected] setROIMode: ROI_sleep];
+                                
 								// unselect all ROIs in the same group
-								[[self windowController] setMode:ROI_sleep toROIGroupWithID:[[curRoiList objectAtIndex:selected] groupID]];
+								[[self windowController] setMode:ROI_sleep toROIGroupWithID: [[curRoiList objectAtIndex:selected] groupID]];
 								DoNothing = YES;
 							}
 						}
 					}
 					else
 					{
-						if( selected == -1 || ( [[curRoiList objectAtIndex: selected] ROImode] != ROI_selected &&  [[curRoiList objectAtIndex: selected] ROImode] != ROI_selectedModify))
+						if( selected == -1 || ([[curRoiList objectAtIndex: selected] ROImode] != ROI_selected && [[curRoiList objectAtIndex: selected] ROImode] != ROI_selectedModify))
 						{
 							// Unselect previous ROIs
-							for( ROI *r in curRoiList) [r setROIMode : ROI_sleep];
+							for( ROI *r in curRoiList)
+                            {
+                                if( r != curROI)
+                                    [r setROIMode : ROI_sleep];
+                            }
 						}
 					}
 							
@@ -4533,19 +4629,19 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 							[roi setROIMode: roiVal];
 												
 							NSArray *winList = [[NSApplication sharedApplication] windows];
-							BOOL	found = NO;
+							BOOL found = NO;
 							
-							if( [self is2DViewer])
+//							if( [self is2DViewer])
 							{
-								for( int i = 0; i < [winList count]; i++)
+								for( NSWindow *w in winList)
 								{
-									if( [[[[winList objectAtIndex:i] windowController] windowNibName] isEqualToString:@"ROI"])
+									if( [[[w windowController] windowNibName] isEqualToString:@"ROI"])
 									{
 										found = YES;
 										
-										[[[winList objectAtIndex:i] windowController] setROI: roi :[self windowController]];
+										[[w windowController] setROI: roi :[self windowController]];
 										if( clickCount > 1)
-											[[winList objectAtIndex:i] makeKeyAndOrderFront: self];
+											[w makeKeyAndOrderFront: self];
 									}
 								}
 								
@@ -4577,20 +4673,20 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 							else
 							{
 								// Unselect previous ROIs
-								for( ROI *r in curRoiList) [r setROIMode : ROI_sleep];
+								for( ROI *r in curRoiList)
+                                    [r setROIMode : ROI_sleep];
 								
-								ROI*		aNewROI;
-								NSString	*roiName = nil, *finalName;
-								long		counter;
-								BOOL		existsAlready;
+								ROI *aNewROI = nil;
+								NSString *roiName = nil, *finalName;
 								
 								drawingROI = NO;
 								
 								[curROI autorelease];
-								curROI = aNewROI = [[[ROI alloc] initWithType: tool : curDCM.pixelSpacingX :curDCM.pixelSpacingY : [DCMPix originCorrectedAccordingToOrientation: curDCM]] autorelease];	//NSMakePoint( curDCM.originX, curDCM.originY)];
+								curROI = aNewROI = [ROI roiWithType: tool inView: self];
+                                
 								[curROI retain];
 								
-								if ( [ROI defaultName] != nil )
+								if( [ROI defaultName] != nil)
 								{
 									[aNewROI setName: [ROI defaultName]];
 								}
@@ -4600,7 +4696,11 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 									{
 										switch( tool)
 										{
-											case  tOval:
+                                            default:
+                                                break;
+                                                
+											case tOval:
+                                            case tOvalAngle:
 												roiName = [NSString stringWithString: NSLocalizedString( @"Oval ", @"keep the space at the end of the string")];
 											break;
 												
@@ -4645,31 +4745,27 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 											case t2DPoint:
 												roiName = [NSString stringWithString: NSLocalizedString( @"Point ", @"keep the space at the end of the string")];
 											break;
-                                                
-                                            default:;
 										}
 										
-										if( roiName )
+										if( roiName)
 										{
-											counter = 1;
+											int counter = 1;
+                                            BOOL existsAlready = NO;
 											do
 											{
-												existsAlready = NO;
-												
 												finalName = [roiName stringByAppendingFormat:@"%d", (int) counter++];
-												
-												for( int i = 0; i < [dcmRoiList count]; i++)
+												existsAlready = NO;
+                                                
+												for( NSArray *a in dcmRoiList)
 												{
-													for( int x = 0; x < [[dcmRoiList objectAtIndex: i] count]; x++)
+													for( ROI *r in a)
 													{
-														if( [[[[dcmRoiList objectAtIndex: i] objectAtIndex: x] name] isEqualToString: finalName])
-														{
+														if( [r.name isEqualToString: finalName])
 															existsAlready = YES;
-														}
 													}
 												}
-												
-											} while (existsAlready != NO);
+											}
+                                            while( existsAlready != NO);
 											
 											[aNewROI setName: finalName];
 										}
@@ -4679,17 +4775,16 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 								// Create aliases of current ROI to the entire series
 								if (([event modifierFlags] & NSShiftKeyMask) && !([event modifierFlags] & NSCommandKeyMask))
 								{
-									for( int i = 0; i < [dcmRoiList count]; i++)
-									{
-										[[dcmRoiList objectAtIndex: i] addObject: aNewROI];
-									}
+									for( NSMutableArray *a in dcmRoiList)
+										[a addObject: aNewROI];
 									
 									aNewROI.originalIndexForAlias = curImage;
 									aNewROI.isAliased = YES;
 								}
 								else [curRoiList addObject: aNewROI];
 								
-								[aNewROI setRoiView :self];
+                                [aNewROI setPix: curDCM];
+								aNewROI.curView = self;
 								
 								if( [[NSUserDefaults standardUserDefaults] boolForKey: @"markROIImageAsKeyImage"])
 								{
@@ -5031,12 +5126,19 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 		{
 			if ([self is2DViewer])
 			{
-				ROI* roi = [self clickInROI:[self ConvertFromNSView2GL:[self convertPoint:[event locationInWindow] fromView:NULL]]];
+				ROI* roi = [self clickInROI:[self ConvertFromNSView2GL:[self convertPoint:event.locationInWindow fromView:NULL]] testTextBox: YES];
 				if (roi)
 					[[self windowController] computeContextualMenuForROI:roi];
-				else [[self windowController] computeContextualMenu];
+				else
+                {
+                    [[self windowController] computeContextualMenu];
+                    
+                    // Select left button tool
+                    [[[self windowController] buttonToolMatrix] selectCellWithTag: 0];
+                    [[self windowController] setButtonTool: [[self windowController] buttonToolMatrix]];
+                }
 			}
-
+            
 			[NSMenu popUpContextMenu:[self menu] withEvent:event forView:self];
 		}
 	}
@@ -5074,7 +5176,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 -(NSMenu*) menuForEvent:(NSEvent *)theEvent
 {
 	if ( pluginOverridesMouse ) return nil;
-	NSPoint contextualMenuWhere = [theEvent locationInWindow]; 	//JF20070103 WindowAnchored ctrl-clickPoint registered 
+	NSPoint contextualMenuWhere = theEvent.locationInWindow; 	//JF20070103 WindowAnchored ctrl-clickPoint registered 
 	contextualMenuInWindowPosX = contextualMenuWhere.x;
 	contextualMenuInWindowPosY = contextualMenuWhere.y;	
 	if (([theEvent modifierFlags] & NSControlKeyMask) && ([theEvent modifierFlags] & NSAlternateKeyMask)) return nil;
@@ -5145,9 +5247,9 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 		
 		@try 
 		{
-			NSPoint     eventLocation = [event locationInWindow];
+			NSPoint     eventLocation = event.locationInWindow;
 			NSPoint     current = [self convertPoint:eventLocation fromView: nil];
-			ToolMode    tool = currentMouseEventTool;
+			short       tool = currentMouseEventTool;
 			
 			[self mouseMoved: event];	// Update some variables...
 			
@@ -5220,14 +5322,6 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
     }
 }
 
-
-// get current Point for Event in the local view Coordinates
-- (NSPoint)currentPointInView:(NSEvent *)event
-{
-	NSPoint eventLocation = [event locationInWindow];
-	return [self convertPoint: eventLocation fromView: nil];
-}
-
 // Check to see if an roi is selected at the Open GL point
 - (BOOL)checkROIsForHitAtPoint:(NSPoint)point  forEvent:(NSEvent *)event
 {
@@ -5256,29 +5350,26 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
     
 	@try
 	{
-		NSPoint current = [self currentPointInView:event];
+		NSPoint current = [self convertPoint: event.locationInWindow fromView: nil];
 		
 		// Command and Alternate rotate ROI
 		if (([event modifierFlags] & NSCommandKeyMask) && ([event modifierFlags] & NSAlternateKeyMask))
 		{
-            if( !mouseDraggedForROIUndo) {
+            if( !mouseDraggedForROIUndo)
+            {
                 mouseDraggedForROIUndo = YES;
                 [[self windowController] addToUndoQueue:@"roi"];
             }
             
 			NSPoint rotatePoint = [self ConvertFromNSView2GL: start];
-
-			NSPoint offset;
-			
-			offset.x = - (previous.x - current.x) / scaleValue;
-			offset.y =  (previous.y - current.y) / scaleValue;
+            float angleInDegree = - (previous.x - current.x) / 2.0;
 			
 			for( ROI *r in curRoiList)
 			{
 				if( [r ROImode] == ROI_selected)
 				{
 					action = YES;
-					[r rotate: offset.x :rotatePoint];
+					[r rotate: angleInDegree :rotatePoint];
 				}
 			}
 		}
@@ -5392,15 +5483,19 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 }
 
 // Methods for Zooming with mouse Drag
-- (void)mouseDraggedZoom:(NSEvent *)event
+
+- (void) mouseSetScale: (float) f
 {
-	NSPoint current = [self currentPointInView:event];
-	
-	[self setScaleValue: (startScaleValue + (current.y - start.y) / (80. * [curDCM pwidth] / 512.))];
+    [self mouseSetScale: f mouseClickCenteredSupport: YES];
+}
+
+- (void) mouseSetScale: (float) f mouseClickCenteredSupport : (BOOL) mouseClickCenteredSupport
+{
+	[self setScaleValue: (startScaleValue + f / (80. * [curDCM pwidth] / 512.))];
 	
 	NSPoint o = NSMakePoint( 0, 0);
 	
-	if( [[NSUserDefaults standardUserDefaults] boolForKey: @"MouseClickZoomCentered"])
+	if( [[NSUserDefaults standardUserDefaults] boolForKey: @"MouseClickZoomCentered"] && mouseClickCenteredSupport)
 	{
 		NSPoint oo = [self convertPointToBacking: start];
 		
@@ -5420,10 +5515,17 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 				   Y: (((originStart.y ) * scaleValue) / startScaleValue) + o.y];
 }
 
+- (void) mouseDraggedZoom:(NSEvent *)event
+{
+	NSPoint current = [self convertPoint: event.locationInWindow fromView: nil];
+	
+	[self mouseSetScale: (current.y - start.y)];
+}
+
 // Method for translating the image while dragging
 - (void)mouseDraggedTranslate:(NSEvent *)event
 {
-	NSPoint current = [self currentPointInView:event];
+	NSPoint current = [self convertPoint: event.locationInWindow fromView: nil];
 	float xmove, ymove, xx, yy;
             
 	xmove = (current.x - start.x);
@@ -5444,8 +5546,8 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	if( [self is2DViewer] == YES && [[self windowController] isPostprocessed] == NO)
 	{
         @try {
-            [self.seriesObj setValue:[NSNumber numberWithFloat:origin.x] forKey:@"xOffset"];
-            [self.seriesObj setValue:[NSNumber numberWithFloat:origin.y] forKey:@"yOffset"];
+            self.seriesObj.xOffset = @(origin.x);
+            self.seriesObj.yOffset = @(origin.y);
         }
         @catch ( NSException *e) {
             N2LogException( e);
@@ -5456,7 +5558,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 //Method for rotating
 - (void)mouseDraggedRotate:(NSEvent *)event
 {
-	NSPoint current = [self currentPointInView:event];
+	NSPoint current = [self convertPoint: event.locationInWindow fromView: nil];
 	
 	current.x -= [self frame].size.width/2.;
 	current.y -= [self frame].size.height/2.;
@@ -5480,7 +5582,8 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 {
 	short   previmage;
 	BOOL	movie4Dmove = NO;
-	NSPoint current = [self currentPointInView:event];
+	NSPoint current = [self convertPoint: event.locationInWindow fromView: nil];
+    
 	if( scrollMode == 0)
 	{
 		if( fabs( start.x - current.x) < fabs( start.y - current.y))
@@ -5495,21 +5598,26 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	
 	if( movie4Dmove == NO)
 	{
+        float reverseScrollWheel = 1.0;
+        
+        if( flippedData)
+            reverseScrollWheel *= -1.0;
+        
 		previmage = curImage;
 		
 		if( scrollMode == 2)
 		{
-			curImage = startImage + ((current.x - start.x) * [dcmPixList count] )/ ([self frame].size.width/2);
+			curImage = startImage + (reverseScrollWheel*(current.x - start.x) * [dcmPixList count] )/ ([self frame].size.width/2);
 		}
 		else if( scrollMode == 1)
 		{
-			curImage = startImage + ((start.y - current.y) * [dcmPixList count] )/ ([self frame].size.height/2);
+			curImage = startImage + (reverseScrollWheel*(start.y - current.y) * [dcmPixList count] )/ ([self frame].size.height/2);
 		}
 		
 		if( curImage < 0) curImage = 0;
 		if( curImage >= [dcmPixList count]) curImage = (long)[dcmPixList count] -1;
 		
-		if(previmage != curImage)
+		if( previmage != curImage)
 		{
 			if( listType == 'i') [self setIndex:curImage];
 			else [self setIndexWithReset:curImage :YES];
@@ -5533,7 +5641,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 - (void)mouseDraggedBlending:(NSEvent *)event
 {
 	float WWAdapter = bdstartWW / 100.0;
-	NSPoint current = [self currentPointInView:event];
+	NSPoint current = [self convertPoint: event.locationInWindow fromView: nil];
     
 	if( WWAdapter < 0.001 * curDCM.slope) WWAdapter = 0.001 * curDCM.slope;
     
@@ -5542,7 +5650,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 		[[[self windowController] thickSlabController] setLowQuality: YES];
 	}
 
-	if( [[[[blendingView dcmFilesList] objectAtIndex:0] valueForKey:@"modality"] isEqualToString:@"PT"] || ([[NSUserDefaults standardUserDefaults] boolForKey:@"mouseWindowingNM"] == YES && [[[[blendingView dcmFilesList] objectAtIndex:0] valueForKey:@"modality"] isEqualToString:@"NM"] == YES))
+	if( [blendingView.imageObj.modality isEqualToString:@"PT"] || ([[NSUserDefaults standardUserDefaults] boolForKey:@"mouseWindowingNM"] == YES && [blendingView.imageObj.modality isEqualToString:@"NM"] == YES))
 	{
 		float startlevel;
 		float endlevel;
@@ -5603,7 +5711,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 
 - (void)mouseDraggedWindowLevel:(NSEvent *)event
 {
-	NSPoint current = [self currentPointInView:event];
+	NSPoint current = [self convertPoint: event.locationInWindow fromView: nil];
 	// Not blending
 	//if( !(blendingView != nil))
 	{
@@ -5616,7 +5724,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 			[[[self windowController] thickSlabController] setLowQuality: YES];
 		}
 		
-		if( [[[dcmFilesList objectAtIndex: curImage] valueForKey:@"modality"] isEqualToString:@"PT"] || ([[NSUserDefaults standardUserDefaults] boolForKey:@"mouseWindowingNM"] == YES && [[[dcmFilesList objectAtIndex: curImage] valueForKey:@"modality"] isEqualToString:@"NM"] == YES))
+		if( [self.imageObj.modality isEqualToString:@"PT"] || ([[NSUserDefaults standardUserDefaults] boolForKey:@"mouseWindowingNM"] == YES && [self.imageObj.modality isEqualToString:@"NM"] == YES))
 		{
 			float startlevel;
 			float endlevel;
@@ -5680,7 +5788,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	NSMutableArray *selectedRois = [NSMutableArray array];
 	for( ROI *r in curRoiList)
 	{
-		long mode = [r ROImode];
+		ROI_mode mode = [r ROImode];
 			
 		if( mode == ROI_selected || mode == ROI_selectedModify || mode == ROI_drawing)
 		{
@@ -5693,7 +5801,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 
 - (void)mouseDraggedRepulsor:(NSEvent *)event
 {
-	NSPoint eventLocation = [event locationInWindow];
+	NSPoint eventLocation = event.locationInWindow;
 	NSPoint tempPt = [self convertPoint:eventLocation fromView: nil];
 	
 	repulsorPosition = tempPt;
@@ -5715,10 +5823,8 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	NSArray *roiArray = [self selectedROIs];
 	if( [roiArray count] == 0) roiArray = curRoiList;
 	
-	for( int i=0; i<[roiArray count]; i++ )
+	for( ROI *r in roiArray)
 	{
-		ROI *r = [roiArray objectAtIndex:i];
-		
 		if([r type] != tAxis && [r type] != tAngle && [r type] != tArrow && [r type] != tDynAngle && [r type] != tTAGT && [r type] != tPlain && r.locked == NO)
 		{		
 			points = [r points];
@@ -5814,7 +5920,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	}
 
 	NSRect frame = [self frame];
-	NSPoint eventLocation = [event locationInWindow];
+	NSPoint eventLocation = event.locationInWindow;
 	NSPoint tempPt = [self convertPoint:eventLocation fromView: nil];
 	tempPt.y = frame.size.height - tempPt.y ;
 	ROISelectorEndPoint = tempPt;
@@ -5961,7 +6067,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
         {
 			if([event modifierFlags] & NSShiftKeyMask) // invert the mode: selected->sleep, sleep->selected
 			{
-				long mode = [roi ROImode];
+				ROI_mode mode = [roi ROImode];
 				if(mode==ROI_sleep) mode=ROI_selected;
 				else if(mode==ROI_selected) mode=ROI_sleep;
 					
@@ -6096,38 +6202,38 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
             //set value for Series Object Presentation State
             if( curDCM.SUVConverted == NO)
             {
-                [self.seriesObj setValue:[NSNumber numberWithFloat:curWW] forKey:@"windowWidth"];
-                [self.seriesObj setValue:[NSNumber numberWithFloat:curWL] forKey:@"windowLevel"];
+                self.seriesObj.windowWidth = @(curWW);
+                self.seriesObj.windowLevel = @(curWL);
                 
                 // Image Level
                 if( curImage >= 0 && COPYSETTINGSINSERIES == NO)
                 {
-                    [self.imageObj setValue:[NSNumber numberWithFloat:curWW] forKey:@"windowWidth"];
-                    [self.imageObj setValue:[NSNumber numberWithFloat:curWL] forKey:@"windowLevel"];
+                    self.imageObj.windowWidth = @(curWW);
+                    self.imageObj.windowLevel = @(curWL);
                 }
                 else
                 {
-                    [self.imageObj setValue: nil forKey:@"windowWidth"];
-                    [self.imageObj setValue: nil forKey:@"windowLevel"];
+                    self.imageObj.windowWidth = nil;
+                    self.imageObj.windowLevel = nil;
                 }
             }
             else
             {
                 if( [self is2DViewer] == YES)
                 {
-                    [self.seriesObj setValue:[NSNumber numberWithFloat:curWW / [[self windowController] factorPET2SUV]] forKey:@"windowWidth"];
-                    [self.seriesObj setValue:[NSNumber numberWithFloat:curWL / [[self windowController] factorPET2SUV]] forKey:@"windowLevel"];
+                    self.seriesObj.windowWidth = @(curWW / [[self windowController] factorPET2SUV]);
+                    self.seriesObj.windowLevel = @(curWL / [[self windowController] factorPET2SUV]);
                     
                     // Image Level
                     if( curImage >= 0 && COPYSETTINGSINSERIES == NO)
                     {
-                        [self.imageObj setValue:[NSNumber numberWithFloat:curWW / [[self windowController] factorPET2SUV]] forKey:@"windowWidth"];
-                        [self.imageObj setValue:[NSNumber numberWithFloat:curWL / [[self windowController] factorPET2SUV]] forKey:@"windowLevel"];
+                        self.imageObj.windowWidth = @(curWW / [[self windowController] factorPET2SUV]);
+                        self.imageObj.windowLevel = @(curWL / [[self windowController] factorPET2SUV]);
                     }
                     else
                     {
-                        [self.imageObj setValue: nil forKey:@"windowWidth"];
-                        [self.imageObj setValue: nil forKey:@"windowLevel"];
+                        self.imageObj.windowWidth = nil;
+                        self.imageObj.windowLevel = nil;
                     }
                 }
             }
@@ -6159,38 +6265,38 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
             //set value for Series Object Presentation State
             if( curDCM.SUVConverted == NO)
             {
-                [self.seriesObj setValue:[NSNumber numberWithFloat:curWW] forKey:@"windowWidth"];
-                [self.seriesObj setValue:[NSNumber numberWithFloat:curWL] forKey:@"windowLevel"];
+                self.seriesObj.windowWidth = @(curWW);
+                self.seriesObj.windowLevel = @(curWL);
                 
                 // Image Level
                 if( curImage >= 0 && COPYSETTINGSINSERIES == NO)
                 {
-                    [self.imageObj setValue:[NSNumber numberWithFloat:curWW] forKey:@"windowWidth"];
-                    [self.imageObj setValue:[NSNumber numberWithFloat:curWL] forKey:@"windowLevel"];
+                    self.imageObj.windowWidth = @(curWW);
+                    self.imageObj.windowLevel = @(curWL);
                 }
                 else
                 {
-                    [self.imageObj setValue: nil forKey:@"windowWidth"];
-                    [self.imageObj setValue: nil forKey:@"windowLevel"];
+                    self.imageObj.windowWidth = nil;
+                    self.imageObj.windowLevel = nil;
                 }
             }
             else
             {
                 if( [self is2DViewer] == YES)
                 {
-                    [self.seriesObj setValue:[NSNumber numberWithFloat:curWW / [[self windowController] factorPET2SUV]] forKey:@"windowWidth"];
-                    [self.seriesObj setValue:[NSNumber numberWithFloat:curWL / [[self windowController] factorPET2SUV]] forKey:@"windowLevel"];
+                    self.seriesObj.windowWidth = @(curWW / [[self windowController] factorPET2SUV]);
+                    self.seriesObj.windowLevel = @(curWL / [[self windowController] factorPET2SUV]);
                     
                     // Image Level
                     if( curImage >= 0 && COPYSETTINGSINSERIES == NO)
                     {
-                        [self.imageObj setValue:[NSNumber numberWithFloat:curWW / [[self windowController] factorPET2SUV]] forKey:@"windowWidth"];
-                        [self.imageObj setValue:[NSNumber numberWithFloat:curWL / [[self windowController] factorPET2SUV]] forKey:@"windowLevel"];
+                        self.imageObj.windowWidth = @(curWW / [[self windowController] factorPET2SUV]);
+                        self.imageObj.windowLevel = @(curWL / [[self windowController] factorPET2SUV]);
                     }
                     else
                     {
-                        [self.imageObj setValue: nil forKey:@"windowWidth"];
-                        [self.imageObj setValue: nil forKey:@"windowLevel"];
+                        self.imageObj.windowWidth = nil;
+                        self.imageObj.windowLevel = nil;
                     }
                 }
             }
@@ -6206,17 +6312,13 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	thickSlabMode = mode;
 	thickSlabStacks = stacks;
 	
-	for ( int i = 0; i < [dcmPixList count]; i++ )
-	{
-		[[dcmPixList objectAtIndex:i] setFusion:mode :stacks :flippedData];
-	}
+	for( DCMPix *p in dcmPixList)
+		[p setFusion:mode :stacks :flippedData];
 	
 	if( [self is2DViewer])
 	{
-		NSArray		*views = [[[self windowController] seriesView] imageViews];
-		
-		for ( int i = 0; i < [views count]; i ++)
-			[[views objectAtIndex: i] updateImage];
+		for( DCMView *v in [[[self windowController] seriesView] imageViews])
+			[v updateImage];
 	}
 	
 	resampledBaseAddrSize = 0;
@@ -6315,11 +6417,6 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	[self updateTilingViews];
 }
 
-- (void) prepareOpenGL
-{
-
-}
-
 + (void) computePETBlendingCLUT
 {
 	if( PETredTable != nil) free( PETredTable);
@@ -6340,23 +6437,17 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 		PETgreenTable = malloc( 256);
 		PETblueTable = malloc( 256);
 		
-		array = [aCLUT objectForKey:@"Red"];
-		for( i = 0; i < 256; i++)
-		{
-			PETredTable[i] = [[array objectAtIndex: i] longValue];
-		}
+        i = 0;
+		for( NSNumber *n in [aCLUT objectForKey:@"Red"])
+			PETredTable[ i++] = [n longValue];
 		
-		array = [aCLUT objectForKey:@"Green"];
-		for( i = 0; i < 256; i++)
-		{
-			PETgreenTable[i] = [[array objectAtIndex: i] longValue];
-		}
+        i = 0;
+		for( NSNumber *n in [aCLUT objectForKey:@"Green"])
+			PETgreenTable[ i++] = [n longValue];
 		
-		array = [aCLUT objectForKey:@"Blue"];
-		for( i = 0; i < 256; i++)
-		{
-			PETblueTable[i] = [[array objectAtIndex: i] longValue];
-		}
+        i = 0;
+		for( NSNumber *n in [aCLUT objectForKey:@"Blue"])
+			PETblueTable[ i++] = [n longValue];
 	}
 	else
 	{
@@ -6373,11 +6464,18 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	}
 }
 
+-(void) setNeedsDisplayToTrue
+{
+    [self setNeedsDisplay: YES];
+}
+
 - (id)initWithFrameInt:(NSRect)frameRect
 {	
 	if( PETredTable == nil)
 		[DCMView computePETBlendingCLUT];
 	
+    firstDisplay = [NSDate timeIntervalSinceReferenceDate];
+    
 	yearOld = nil;
 	syncSeriesIndex = -1;
 	mouseXPos = mouseYPos = 0;
@@ -6395,7 +6493,6 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
     
 	cursor = [[NSCursor contrastCursor] retain];
 	syncRelativeDiff = 0;
-	volumicSeries = YES;
 
 	currentToolRight = tZoom;
 	
@@ -6437,7 +6534,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
     
     drawingFrameRect = [self convertRectToBacking: [self frame]]; //retina
     
-	cursorTracking = [[NSTrackingArea alloc] initWithRect: [self visibleRect] options: (NSTrackingCursorUpdate | NSTrackingInVisibleRect | NSTrackingMouseEnteredAndExited | NSTrackingActiveInKeyWindow) owner: self userInfo: nil];
+	cursorTracking = [[NSTrackingArea alloc] initWithRect: [self bounds] options: (NSTrackingCursorUpdate | NSTrackingActiveInActiveApp | NSTrackingInVisibleRect | NSTrackingMouseEnteredAndExited | NSTrackingMouseMoved) owner: self userInfo: nil];
 	[self addTrackingArea: cursorTracking];
 		
 	blendingView = nil;
@@ -6553,6 +6650,8 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 
 	repulsorRadius = 0;
 	
+//    [self setWantsLayer: YES];
+    
 //    if( [[[[NSUserDefaults standardUserDefaults] persistentDomainForName: @"com.apple.CoreGraphics"] objectForKey: @"DisplayUseInvertedPolarity"] boolValue])
 //    {
 //        [self setWantsLayer: YES];
@@ -6574,6 +6673,9 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 
 - (void)windowWillClose:(NSNotification *)notification
 {
+    if( [ViewerController poolOf2DViewers] && [self is2DViewer])
+        return;
+    
 	if( [notification object] == [self window])
 	{
 		[[self window] setAcceptsMouseMovedEvents: NO];
@@ -6624,8 +6726,8 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	if( p.frameofReferenceUID)
 		[instructions setObject: p.frameofReferenceUID forKey: @"frameofReferenceUID"];
 	
-	if( [[dcmFilesList objectAtIndex: curImage] valueForKeyPath:@"series.study.studyInstanceUID"])
-		[instructions setObject: [[dcmFilesList objectAtIndex: curImage] valueForKeyPath:@"series.study.studyInstanceUID"] forKey: @"studyID"]; 
+	if( self.studyObj.studyInstanceUID)
+		[instructions setObject: self.studyObj.studyInstanceUID forKey: @"studyID"];
 	
 	if( curDCM)
 		[instructions setObject: curDCM forKey: @"DCMPix"];
@@ -6646,7 +6748,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
         
 		if( instructions)
 		{
-            [[NSNotificationCenter defaultCenter] postNotificationName: OsirixSyncNotification object: self userInfo: instructions];
+            [[NSNotificationCenter defaultCenter] postNotificationName: OsirixSyncNotification object: nil userInfo: instructions];
 				
 			// most subclasses just need this. NO sync notification for subclasses.
 			if( blendingView) // We have to reload the blending image..
@@ -6831,6 +6933,55 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	syncOnLocationImpossible = v;
 }
 
+- (BOOL) volumicSeries
+{
+    if( self.volumicData == 1)
+        return YES;
+    
+    return NO;
+}
+
+- (int) volumicData
+{
+    if( self.is2DViewer && volumicData == -1 && [self.windowController isEverythingLoaded])
+        volumicData = [self.windowController isDataVolumicIn4D: YES checkEverythingLoaded: YES tryToCorrect: NO];
+    
+    return volumicData;
+}
+
++ (BOOL) areDCMPixParallelInArray:(NSArray*) a
+{
+    float vectors[ 9];
+    
+    if( a.count == 0)
+        return NO;
+    
+    [[a objectAtIndex: 0] orientation: vectors];
+    
+    for( DCMPix* pix in a)
+    {
+        float other[ 9];
+        
+        [pix orientation: other];
+        
+        if( [DCMView angleBetweenVector: other+6 andVector:vectors+6] >= [[NSUserDefaults standardUserDefaults] floatForKey: @"PARALLELPLANETOLERANCE"])
+            return NO;
+    }
+    
+    return YES;
+}
+
+- (BOOL) areDCMPixParallel
+{
+    if( self.is2DViewer && areDCMPixParallel == -1 && [self.windowController isEverythingLoaded])
+        areDCMPixParallel = [DCMView areDCMPixParallelInArray: dcmPixList];
+    
+    if( areDCMPixParallel == -1)
+        return NO;
+    
+    return areDCMPixParallel;
+}
+
 -(void) sync:(NSNotification*)note
 {
     if( gDontListenToSyncMessage)
@@ -6846,7 +6997,9 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
         if( [[self windowController] windowWillClose])
             return;
 		
-		if( avoidRecursiveSync > 1) return; // Keep this number, to have cross reference correctly displayed
+		if( avoidRecursiveSync > 1)
+            return; // Keep this number, to have cross reference correctly displayed
+        
 		avoidRecursiveSync++;
 		
 		if( [note object] != self && isKeyView == YES && matrix == 0 && newImage > -1)
@@ -6921,13 +7074,13 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 					{
 						float resultPoint[ 3];
 						
-						int newIndex = [self findPlaneAndPoint: destPoint3D :resultPoint];
+                        int newIndex = [self findPlaneAndPoint: destPoint3D :resultPoint];
 						
 						if( newIndex != -1)
 						{
 							newImage = newIndex;
 							
-							[curDCM convertDICOMCoords: resultPoint toSliceCoords: slicePoint3D];
+							[curDCM convertDICOMCoords: resultPoint toSliceCoords: slicePoint3D pixelCenter: NO];
                             [self setNeedsDisplay:YES];
 						}
 						else
@@ -6976,12 +7129,33 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 				// Based on Location
 				if( (syncro == syncroLOC && point3D == NO) || syncSeriesIndex != -1)
 				{
-					if( volumicSeries == YES && [otherView volumicSeries] == YES)
+                    BOOL selfVolumic = self.volumicData;
+                    BOOL otherVolumic = otherView.volumicData;
+                    
+                    if( selfVolumic == NO && dcmPixList.count >= 3)
+                    {
+                        if( self.areDCMPixParallel)
+                        {
+                            if( fabs( [(DCMPix*)[dcmPixList objectAtIndex: dcmPixList.count-2] sliceLocation] - [(DCMPix*)[dcmPixList objectAtIndex: 1] sliceLocation]) > 10) // 10 = 1 cm
+                                selfVolumic = YES;
+                        }
+                    }
+                    
+                    if( otherVolumic == NO && otherView.dcmPixList.count >= 3)
+                    {
+                        if( otherView.areDCMPixParallel)
+                        {
+                            if( fabs( [(DCMPix*)[otherView.dcmPixList objectAtIndex: otherView.dcmPixList.count-2] sliceLocation] - [(DCMPix*)[otherView.dcmPixList objectAtIndex: 1] sliceLocation]) > 10) // 10 = 1 cm
+                                otherVolumic = YES;
+                        }
+                    }
+                    
+					if( selfVolumic && otherVolumic)
 					{
                         float orientA[9], orientB[9];
                         
-                        [[self curDCM] orientation:orientA];
-                        [[otherView curDCM] orientation:orientB];
+                        [[self.dcmPixList objectAtIndex: self.dcmPixList.count/2] orientation: orientA];
+                        [[otherView.dcmPixList objectAtIndex: otherView.dcmPixList.count/2] orientation: orientB];
                         
                         float planeTolerance = [[NSUserDefaults standardUserDefaults] floatForKey: @"PARALLELPLANETOLERANCE-Sync"]; //We don't need to be very strict :
                         
@@ -6994,8 +7168,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
                             // if( (sliceVector[0] == 0 && sliceVector[1] == 0 && sliceVector[2] == 0) || syncSeriesIndex != -1)  // Planes are parallel !
 							{
 								BOOL	noSlicePosition = NO, everythingLoaded = YES;
-//								float   firstSliceLocation;
-								int		index = -1, i;
+								int		index = -1;
 								float   smallestdiff = -1, fdiff, slicePosition;
 								
 								if( [[self windowController] isEverythingLoaded] && [[otherView windowController] isEverythingLoaded] && (syncSeriesIndex == -1 || [otherView syncSeriesIndex] == -1))
@@ -7008,16 +7181,18 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 								}
 								else
 								{
-//									firstSliceLocation = [[[dcmFilesList objectAtIndex: 0] valueForKey:@"sliceLocation"] floatValue];
-								
-									for( i = 0; i < [dcmFilesList count]; i++)
+									for( int i = 0; i < [dcmFilesList count]; i++)
 									{
-										everythingLoaded = [[dcmPixList objectAtIndex: i] isLoaded];
-										if( everythingLoaded)
-											slicePosition = [(DCMPix*)[dcmPixList objectAtIndex: i] sliceLocation];
+                                        DCMPix *pix = [dcmPixList objectAtIndex: i];
+                                        
+										if( [pix isLoaded])
+											slicePosition = [pix sliceLocation];
 										else
-											slicePosition = [[[dcmFilesList objectAtIndex: i] valueForKey:@"sliceLocation"] floatValue];
-										
+                                        {
+                                            DicomImage * im = [dcmFilesList objectAtIndex: i];
+											slicePosition = [im.sliceLocation floatValue];
+                                        }
+                                        
 										fdiff = slicePosition - loc;
 										
 										if( registeredViewer == NO)
@@ -7028,7 +7203,6 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 												if( [otherView syncSeriesIndex] != -1 && syncSeriesIndex != -1)
 												{
 													slicePosition -= (syncRelativeDiff - otherView.syncRelativeDiff);
-													
 													fdiff = slicePosition - loc;
 												}
 												else if( [[NSUserDefaults standardUserDefaults] boolForKey:@"SAMESTUDY"]) noSlicePosition = YES;
@@ -7039,6 +7213,12 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 										
 										if( fdiff < smallestdiff || smallestdiff == -1)
 										{
+                                            if( pix.isLoaded)
+                                            {
+                                                [pix orientation:orientA];
+                                                if( [DCMView angleBetweenVector: orientA+6 andVector:orientB+6] > planeTolerance)
+                                                    continue;
+                                            }
 											smallestdiff = fdiff;
 											index = i;
 										}
@@ -7050,7 +7230,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 									if( index >= 0)
 										newImage = index;
 									
-									if( [dcmPixList count] > 1)
+									if( [dcmPixList count] >= 3)
 									{
 										float sliceDistance;
 										
@@ -7076,7 +7256,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 							}
 						}
 					}
-					else if( volumicSeries == NO && [otherView volumicSeries] == NO)	// For example time or functional series
+					else if( selfVolumic == 0 && otherVolumic == 0)	// For example time or functional series
 					{
                         if( [[NSUserDefaults standardUserDefaults] integerForKey: @"DefaultModeForNonVolumicSeries"] == syncroRatio)
                         {
@@ -7096,7 +7276,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
                         if( newImage < 0) newImage = 0;
 					}
 				}
-
+                
 				 // Relative
 				 if( syncro == syncroREL && point3D == NO && syncSeriesIndex == -1)
 				 {
@@ -7203,6 +7383,12 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 
 -(void) roiRemoved:(NSNotification*)note
 {
+    if( curROI == note.object)
+    {
+        [curROI autorelease];
+        curROI = nil;
+    }
+    
 	if( [self needsDisplay]) return;
 	
 	// A ROI has been removed... do we display it? If yes, update!
@@ -7552,6 +7738,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 		a.y += curDCM.pheight * curDCM.pixelRatio * 0.5f;
 		a.y /= curDCM.pixelRatio;
     }
+    
     return a;
 }
 
@@ -7571,8 +7758,15 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	
 	glScalef (2.0f /(xFlipped ? -(size.size.width) : size.size.width), -2.0f / (yFlipped ? -(size.size.height) : size.size.height), 1.0f); // scale to port per pixel scale
 	glRotatef (rotation, 0.0f, 0.0f, 1.0f); // rotate matrix for image rotation
-	glTranslatef( origin.x - offset.x , -origin.y - offset.y, 0.0f);
-
+    
+    if( zoomIsSoftwareInterpolated) // Correction for Lanczos "zoom & shift" artefact
+    {
+        offset.x += resampledScale * 3. * scaleValue / 40.;
+        offset.y += resampledScale * 3. * scaleValue / 40.;
+	}
+    
+    glTranslatef( origin.x - offset.x , -origin.y - offset.y, 0.0f);
+    
 	if( curDCM.pixelRatio != 1.0) glScalef( 1.f, curDCM.pixelRatio, 1.f);
 	
 	effectiveTextureMod = 0;	//2;	//OVERLAP
@@ -7663,7 +7857,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 		orientationY = vector[ 1] < 0 ? NSLocalizedString( @"A", @"A: Anterior") : NSLocalizedString( @"P", @"P: Posterior");
 		orientationZ = vector[ 2] < 0 ? NSLocalizedString( @"I", @"I: Inferior") : NSLocalizedString( @"S", @"S: Superior");
 	}
-	
+    
 	float absX = fabs( vector[ 0]);
 	float absY = fabs( vector[ 1]);
 	float absZ = fabs( vector[ 2]);
@@ -7742,6 +7936,30 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
     return norm( sub);
 }
 
++ (double) pbaseDouble_Plane: (double*) point :(double*) planeOrigin :(double*) planeVector :(double*) pointProjection
+{
+    double sb, sn, sd;
+    double sub[ 3];
+    
+    sub[ 0] = point[ 0] - planeOrigin[ 0];
+    sub[ 1] = point[ 1] - planeOrigin[ 1];
+    sub[ 2] = point[ 2] - planeOrigin[ 2];
+    
+    sn = -dot( planeVector, sub);
+    sd = dot( planeVector, planeVector);
+    sb = sn / sd;
+    
+    pointProjection[ 0] = point[ 0] + sb * planeVector[ 0];
+    pointProjection[ 1] = point[ 1] + sb * planeVector[ 1];
+    pointProjection[ 2] = point[ 2] + sb * planeVector[ 2];
+    
+    sub[ 0] = point[ 0] - pointProjection[ 0];
+    sub[ 1] = point[ 1] - pointProjection[ 1];
+    sub[ 2] = point[ 2] - pointProjection[ 2];
+    
+    return norm( sub);
+}
+
 + (float) angleBetweenVector: (float*) v1 andVector: (float*) v2
 {
     if( v1[ 0] == 0 && v1[ 1] == 0 && v1[ 2] == 0 && v2[ 0] == 0 && v2[ 1] == 0 && v2[ 2] == 0)
@@ -7754,6 +7972,9 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
         return deg2rad* 180;
     
     float cosTheta = dot( v1, v2) / (norm( v1)*norm( v2));
+    
+    if( cosTheta > 1)
+        cosTheta = 1;
     
     return acosf( cosTheta);
 }
@@ -7770,6 +7991,9 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
         return deg2rad* 180;
     
     double cosTheta = dot( v1, v2) / (norm( v1)*norm( v2));
+    
+    if( cosTheta > 1)
+        cosTheta = 1;
     
     return acos( cosTheta);
 }
@@ -7828,25 +8052,35 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 
 - (int) findPlaneForPoint:(float*) pt preferParallelTo:(float*)parto localPoint:(float*) location distanceWithPlane: (float*) distanceResult
 {
+    return [self findPlaneForPoint: pt preferParallelTo: parto localPoint: location distanceWithPlane: distanceResult limitWithSliceThickness: YES];
+}
+
+- (int) findPlaneForPoint:(float*) pt preferParallelTo:(float*)parto localPoint:(float*) location distanceWithPlane: (float*) distanceResult limitWithSliceThickness: (BOOL) limitWithSliceThickness
+{
 	int		ii = -1;
 	float	vectors[ 9], orig[ 3], locationTemp[ 3];
 	float	distance = 999999, tempDistance;
 	
     BOOL vParallel = NO;
     
-    if( cleanedOutDcmPixArray == nil)
-        cleanedOutDcmPixArray = [[DCMView cleanedOutDcmPixArray:dcmPixList] retain];
+    if( self.cleanedOutDcmPixArray == nil)
+        self.cleanedOutDcmPixArray = [DCMView cleanedOutDcmPixArray:dcmPixList];
     
     BOOL currParallel = NO;
     if( volumicData == 1) // All planes have the same orientation : we can compute currParallel only once !
     {
-        [[cleanedOutDcmPixArray lastObject] orientation: vectors];
+        [[self.cleanedOutDcmPixArray objectAtIndex: self.cleanedOutDcmPixArray.count/2] orientation: vectors];
         if (parto && [DCMView angleBetweenVector: parto+6 andVector:vectors+6] < [[NSUserDefaults standardUserDefaults] floatForKey: @"PARALLELPLANETOLERANCE"]) // are parallel!
             currParallel = YES;
     }
     
+    NSUInteger indexOfCurrentImage = [self.cleanedOutDcmPixArray indexOfObject: curDCM];
+    
+    if( indexOfCurrentImage == NSNotFound)
+        indexOfCurrentImage = 0;
+    
     int i = 0;
-	for( DCMPix* pix in cleanedOutDcmPixArray)
+	for( DCMPix* pix in self.cleanedOutDcmPixArray)
     {
         if( volumicData != 1)
         {
@@ -7861,36 +8095,54 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
         [pix origin: orig];
 		tempDistance = [DCMView pbase_Plane: pt :orig :&(vectors[ 6]) :locationTemp];
 		
-		if ((!vParallel && currParallel) || (currParallel == vParallel && tempDistance < distance))
+		if ((!vParallel && currParallel) || (currParallel == vParallel && tempDistance <= distance))
 		{
-            vParallel = currParallel;
-            
-			if( location)
-			{
-				location[ 0] = locationTemp[ 0];
-				location[ 1] = locationTemp[ 1];
-				location[ 2] = locationTemp[ 2];
-			}
-			
-			distance = tempDistance;
-			ii = i;
+            if( ii != -1 && currParallel == vParallel && tempDistance == distance && fabs( (float) indexOfCurrentImage - (float) i) > fabs( (float) indexOfCurrentImage - (float) ii))
+            {
+            }
+            else
+            {
+                vParallel = currParallel;
+                
+                if( location)
+                {
+                    location[ 0] = locationTemp[ 0];
+                    location[ 1] = locationTemp[ 1];
+                    location[ 2] = locationTemp[ 2];
+                }
+                
+                distance = tempDistance;
+                ii = i;
+            }
 		}
         
         i++;
 	}
 	
-	if( ii != -1 )
+	if( ii != -1 && limitWithSliceThickness)
 	{
-		if( curDCM.sliceThickness != 0 && distance > curDCM.sliceThickness * 2) ii = -1;
+		if( curDCM.sliceThickness != 0 && distance > curDCM.sliceThickness * 2)
+            ii = -1;
 	}
 	
 	if( distanceResult)
 		*distanceResult = distance;
 	
+    if( ii != -1)
+    {
+        NSUInteger index = [self.dcmPixList indexOfObject: [self.cleanedOutDcmPixArray objectAtIndex: ii]];
+        
+        if( index != NSNotFound)
+            ii = index;
+        else
+            ii = -1;
+    }
+    
 	return ii;
 }
 
-- (int) findPlaneForPoint:(float*) pt localPoint:(float*) location distanceWithPlane: (float*) distanceResult {
+- (int) findPlaneForPoint:(float*) pt localPoint:(float*) location distanceWithPlane: (float*) distanceResult
+{
     return [self findPlaneForPoint:pt preferParallelTo:nil localPoint:location distanceWithPlane:distanceResult];
 }
 
@@ -8066,15 +8318,15 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 		_stringSize = stringSize;
 //	}
     
+    if( NSIsEmptyRect( screenCaptureRect) == NO)
+        size = screenCaptureRect;
+    else
+        size.origin = NSMakePoint( 0, 0);
+    
 	if (annotations == 4)
         [[NSNotificationCenter defaultCenter] postNotificationName: OsirixDrawTextInfoNotification object: self];
 	else if( annotations > annotGraphics)
 	{
-        if( NSIsEmptyRect( screenCaptureRect) == NO)
-            size = screenCaptureRect;
-        else
-            size.origin = NSMakePoint( 0, 0);
-        
 		NSMutableString *tempString, *tempString2, *tempString3, *tempString4;
 		long yRaster = 1, xRaster;
 		
@@ -8154,35 +8406,34 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 		[yRasterIncrement setObject:[NSNumber numberWithInt:-_stringSize.height] forKey:@"LowerMiddle"];
 		
         
-        int j, k, increment;
+        int increment;
         NSArray *orientationPositionKeys = [NSArray arrayWithObjects:@"TopMiddle", @"MiddleLeft", @"MiddleRight", @"LowerMiddle", nil];
         BOOL orientationDrawn = NO;
         {
            id annot;
            NSEnumerator *enumerator;
             
-            for (k=0; k<[orientationPositionKeys count]; k++)
+            for( NSString *key in orientationPositionKeys)
             {
-                NSArray *annotations = [annotationsDictionary objectForKey:[orientationPositionKeys objectAtIndex:k]];
-                xRaster = [[xRasterInit objectForKey:[orientationPositionKeys objectAtIndex:k]] intValue];
-                yRaster = [[yRasterInit objectForKey:[orientationPositionKeys objectAtIndex:k]] intValue];
-                increment = [[yRasterIncrement objectForKey:[orientationPositionKeys objectAtIndex:k]] intValue];
+                NSArray *annotations = [annotationsDictionary objectForKey: key];
+                xRaster = [[xRasterInit objectForKey: key] intValue];
+                yRaster = [[yRasterInit objectForKey: key] intValue];
+                increment = [[yRasterIncrement objectForKey: key] intValue];
                 
-                if([[orientationPositionKeys objectAtIndex:k] hasPrefix:@"Lower"])
+                if([key hasPrefix:@"Lower"])
                     enumerator = [annotations reverseObjectEnumerator];
                 else
                     enumerator = [annotations objectEnumerator];
                 
                 while ((annot = [enumerator nextObject]))
                 {
-                    for (j=0; j<[annot count]; j++)
+                    for( NSString *s in annot)
                     {
-                        if([[annot objectAtIndex:j] isEqualToString:@"Orientation"])
+                        if([s isEqualToString:@"Orientation"])
                         {
                             if(!orientationDrawn)
-                            {
                                 [self drawOrientation: size];
-                            }
+                            
                             orientationDrawn = YES;
                         }
                     }
@@ -8198,12 +8449,8 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 			[yRasterInit setObject:[NSNumber numberWithInt:[[yRasterInit objectForKey:@"LowerMiddle"] intValue]+[[yRasterIncrement objectForKey:@"LowerMiddle"] intValue]] forKey:@"LowerMiddle"];
 		}
 		
-		NSArray *keys = [annotationsDictionary allKeys];
-		
-		for (k=0; k<[keys count]; k++)
+		for( NSString *key in [annotationsDictionary allKeys])
 		{
-			NSString *key = [keys objectAtIndex:k];
-			
 			NSArray *annotations = [annotationsDictionary objectForKey:key];
 			xRaster = [[xRasterInit objectForKey:key] intValue]; //* [self.window backingScaleFactor]; //Retina
 			yRaster = [[yRasterInit objectForKey:key] intValue]; //* [self.window backingScaleFactor]; //Retina
@@ -8231,45 +8478,83 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 					tempString2 = [NSMutableString stringWithString:@""];
 					tempString3 = [NSMutableString stringWithString:@""];
 					tempString4 = [NSMutableString stringWithString:@""];
-					for (j=0; j<[annot count]; j++)
+					for( NSString *a in annot)
 					{
-						if([[annot objectAtIndex:j] isEqualToString:@"Image Size"] && fullText)
+						if([a isEqualToString:@"Image Size"] && fullText)
 						{
 							[tempString appendFormat: NSLocalizedString( @"Image size: %ld x %ld", nil), (long) curDCM.pwidth, (long) curDCM.pheight];
 							useStringTexture = YES;
 						}
-						else if([[annot objectAtIndex:j] isEqualToString:@"View Size"] && fullText)
+						else if([a isEqualToString:@"View Size"] && fullText)
 						{
 							[tempString appendFormat: NSLocalizedString( @"View size: %ld x %ld", nil), (long) size.size.width, (long) size.size.height];
 							useStringTexture = YES;
 						}
-						else if([[annot objectAtIndex:j] isEqualToString:@"Mouse Position (px)"])
+						else if([a isEqualToString:@"Mouse Position (px)"])
 						{
 							useStringTexture = NO;
 							
                             if( stringID.length == 0 || [stringID isEqualToString: @"previewDatabase"])
                             {
-//                                if(mouseXPos!=0 || mouseYPos!=0)
+//                                if( self.window.isKeyWindow)
                                 {
                                     NSString *pixelUnit = @"";
                                     
                                     if( curDCM.SUVConverted)
                                         pixelUnit = @"SUV";
                                     
-                                    if( curDCM.isRGB ) [tempString appendFormat: NSLocalizedString( @"X: %d px Y: %d px Value: R:%ld G:%ld B:%ld", @"No special characters for this string, only ASCII characters."), (int)mouseXPos, (int)mouseYPos, pixelMouseValueR, pixelMouseValueG, pixelMouseValueB];
-                                    else [tempString appendFormat: NSLocalizedString( @"X: %d px Y: %d px Value: %2.2f %@", @"No special characters for this string, only ASCII characters."), (int)mouseXPos, (int)mouseYPos, pixelMouseValue, pixelUnit];
-                                    
-                                    if( blendingView)
+                                    if( mouseOnView)
                                     {
-                                        if( [blendingView curDCM].SUVConverted)
-                                            pixelUnit = @"SUV";
+                                        int intMouseXPos = mouseXPos, intMouseYPos = mouseYPos;
                                         
-                                        if( [blendingView curDCM].isRGB )
-                                            [tempString2 appendFormat: NSLocalizedString( @"Fused Image : X: %d px Y: %d px Value: R:%ld G:%ld B:%ld", @"No special characters for this string, only ASCII characters."), (int)blendingMouseXPos, (int)blendingMouseYPos, blendingPixelMouseValueR, blendingPixelMouseValueG, blendingPixelMouseValueB];
-                                        else [tempString2 appendFormat: NSLocalizedString( @"Fused Image : X: %d px Y: %d px Value: %2.2f %@", @"No special characters for this string, only ASCII characters."), (int)blendingMouseXPos, (int)blendingMouseYPos, blendingPixelMouseValue, pixelUnit];
+                                        if( mouseXPos < 0) intMouseXPos --;
+                                        if( mouseYPos < 0) intMouseYPos --;
+                                        
+                                        [tempString appendFormat: NSLocalizedString( @"X: %d px Y: %d px", @"No special characters for this string, only ASCII characters."), intMouseXPos, intMouseYPos];
+                                    
+                                        if( mouseOnImage)
+                                        {
+                                            if( curDCM.isRGB)
+                                            {
+                                                [tempString appendString: @" "];
+                                                [tempString appendFormat: NSLocalizedString( @"Value: R:%ld G:%ld B:%ld", @"No special characters for this string, only ASCII characters."), pixelMouseValueR, pixelMouseValueG, pixelMouseValueB];
+                                            }
+                                            else
+                                            {
+                                                [tempString appendString: @" "];
+                                                [tempString appendFormat: NSLocalizedString( @"Value: %2.2f %@", @"No special characters for this string, only ASCII characters."), pixelMouseValue, pixelUnit];
+                                            }
+                                        }
+                                    
+                                        if( blendingView)
+                                        {
+                                            if( [blendingView curDCM].SUVConverted)
+                                                pixelUnit = @"SUV";
+                                            
+                                            int intMouseXPos = blendingMouseXPos, intMouseYPos = blendingMouseYPos;
+                                            
+                                            if( blendingMouseXPos < 0) intMouseXPos --;
+                                            if( blendingMouseYPos < 0) intMouseYPos --;
+                                            
+                                            [tempString2 appendFormat: NSLocalizedString( @"Fused Image : X: %d px Y: %d px", @"No special characters for this string, only ASCII characters."), intMouseXPos, intMouseYPos];
+                                        
+                                            if( blendingMouseOnImage)
+                                            {
+                                                if( [blendingView curDCM].isRGB)
+                                                {
+                                                    [tempString2 appendString: @" "];
+                                                    [tempString2 appendFormat: NSLocalizedString( @"Value: R:%ld G:%ld B:%ld", @"No special characters for this string, only ASCII characters."), blendingPixelMouseValueR, blendingPixelMouseValueG, blendingPixelMouseValueB];
+                                                }
+                                                else
+                                                {
+                                                    [tempString2 appendString: @" "];
+                                                    [tempString2 appendFormat: NSLocalizedString( @"Value: %2.2f %@", @"No special characters for this string, only ASCII characters."), blendingPixelMouseValue, pixelUnit];
+                                                }
+                                            }
+                                        }
                                     }
                                     
-                                    if( curDCM.displaySUVValue )
+                                    if( curDCM.displaySUVValue)
                                     {
                                         if( [curDCM hasSUV] == YES && curDCM.SUVConverted == NO)
                                         {
@@ -8287,25 +8572,17 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
                                 }
                             }
 						}
-						else if([[annot objectAtIndex:j] isEqualToString:@"Zoom"] && fullText)
+						else if([a isEqualToString:@"Zoom"] && fullText)
 						{
 							[tempString appendFormat: NSLocalizedString( @"Zoom: %0.0f%%", @"No special characters for this string, only ASCII characters."), (float) [self displayedScaleValue]*100.0];
 							useStringTexture = NO;
 						}
-						else if([[annot objectAtIndex:j] isEqualToString:@"Rotation Angle"] && fullText)
-						{
-							[tempString appendFormat: NSLocalizedString( @" Angle: %0.0f", @"No special characters for this string, only ASCII characters."), (float) ((long) [self displayedRotation] % 360)];
-							useStringTexture = NO;
-						}
-						else if([[annot objectAtIndex:j] isEqualToString:@"Image Position"] && fullText)
+						else if([a isEqualToString:@"Image Position"] && fullText)
 						{
 							NSString *orientationStack = @"";
 							if( [self is2DViewer] && [[self windowController] isEverythingLoaded] == YES)
 							{
-								if( volumicData == -1)
-									volumicData = [[self windowController] isDataVolumicIn4D: YES checkEverythingLoaded: YES tryToCorrect: NO];
-								
-								if( volumicSeries == YES && [dcmPixList count] > 2 && volumicData == 1)
+								if( self.volumicData == 1 && [dcmPixList count] > 2)
 								{
 									double interval3d;
 									double xd = [[dcmPixList objectAtIndex: 2] originX] - [[dcmPixList objectAtIndex: 1] originX]; // To avoid the problem with 1st scout image
@@ -8366,7 +8643,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 
 							useStringTexture = NO;
 						}
-						else if([[annot objectAtIndex:j] isEqualToString:@"Mouse Position (mm)"])
+						else if([a isEqualToString:@"Mouse Position (mm)"])
 						{
 							useStringTexture = NO;
 							
@@ -8391,24 +8668,30 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 										[curDCM convertPixX: mouseXPos pixY: mouseYPos toDICOMCoords: location pixelCenter: YES];
 									}
 									
-                                    if( curDCM.is3DPlane)
+                                    if( mouseOnView)
                                     {
-                                        if(fabs(location[0]) < 1.0 && location[0] != 0.0 && curDCM.pixelSpacingX < 0.2)
-                                            [tempString appendFormat: @"X: %2.2f %cm Y: %2.2f %cm Z: %2.2f %cm", location[0] * 1000.0, 0xB5, location[1] * 1000.0, 0xB5, location[2] * 1000.0, 0xB5];
+                                        if( self.mousePosUSRegion.length)
+                                            [tempString3 appendString: self.mousePosUSRegion];
+                                        
+                                        else if( curDCM.is3DPlane)
+                                        {
+                                            if(fabs(location[0]) < 1.0 && location[0] != 0.0 && curDCM.pixelSpacingX < 0.2)
+                                                [tempString appendFormat: NSLocalizedString( @"X: %2.2f %cm Y: %2.2f %cm Z: %2.2f %cm", nil), location[0] * 1000.0, 0xB5, location[1] * 1000.0, 0xB5, location[2] * 1000.0, 0xB5];
+                                            else
+                                                [tempString appendFormat: NSLocalizedString( @"X: %2.2f mm Y: %2.2f mm Z: %2.2f mm", nil), location[0], location[1], location[2]];
+                                        }
                                         else
-                                            [tempString appendFormat: @"X: %2.2f mm Y: %2.2f mm Z: %2.2f mm", location[0], location[1], location[2]];
-                                    }
-                                    else
-                                    {
-                                        if(fabs(location[0]) < 1.0 && location[0] != 0.0 && curDCM.pixelSpacingX < 0.2)
-                                            [tempString appendFormat: @"X: %2.2f %cm Y: %2.2f %cm", location[0] * 1000.0, 0xB5, location[1] * 1000.0, 0xB5];
-                                        else
-                                            [tempString appendFormat: @"X: %2.2f mm Y: %2.2f mm", location[0], location[1]];
+                                        {
+                                            if(fabs(location[0]) < 1.0 && location[0] != 0.0 && curDCM.pixelSpacingX < 0.2)
+                                                [tempString appendFormat: NSLocalizedString( @"X: %2.2f %cm Y: %2.2f %cm", nil), location[0] * 1000.0, 0xB5, location[1] * 1000.0, 0xB5];
+                                            else
+                                                [tempString appendFormat: NSLocalizedString( @"X: %2.2f mm Y: %2.2f mm", nil), location[0], location[1]];
+                                        }
                                     }
 								}
 							}
 						}
-						else if([[annot objectAtIndex:j] isEqualToString:@"Window Level / Window Width"])
+						else if([a isEqualToString:@"Window Level / Window Width"])
 						{
 							useStringTexture = NO;
 							
@@ -8425,7 +8708,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 							else
 								[tempString appendFormat: NSLocalizedString( @"WL: %d WW: %d", @"WW: window width, WL: window level"), (int) lwl, (int) lww];
 							
-							if( [[[dcmFilesList objectAtIndex: curImage] valueForKey:@"modality"] isEqualToString:@"PT"] || ([[NSUserDefaults standardUserDefaults] boolForKey:@"mouseWindowingNM"] && [[[dcmFilesList objectAtIndex: curImage] valueForKey:@"modality"] isEqualToString:@"NM"]))
+							if( [self.imageObj.modality isEqualToString:@"PT"] || ([[NSUserDefaults standardUserDefaults] boolForKey:@"mouseWindowingNM"] && [self.imageObj.modality isEqualToString:@"NM"]))
 							{
 								if( curDCM.maxValueOfSeries)
 								{
@@ -8435,7 +8718,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 								}
 							}
 						}
-						else if( [[annot objectAtIndex:j] isEqualToString:@"Plugin"] )
+						else if( [a isEqualToString:@"Plugin"] )
 						{
 							
 							NSDictionary *userInfo = [NSDictionary dictionaryWithObjectsAndKeys:
@@ -8451,13 +8734,13 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 							yRaster += increment;
 						}
 						
-						else if([[annot objectAtIndex:j] isEqualToString:@"Orientation"])
+						else if([a isEqualToString:@"Orientation"])
 						{
 							if(!orientationDrawn) [self drawOrientation: size];
 							orientationDrawn = YES;
 							useStringTexture = YES;
 						}
-						else if([[annot objectAtIndex:j] isEqualToString:@"Thickness / Location / Position"])
+						else if([a isEqualToString:@"Thickness / Location / Position"])
 						{
 							useStringTexture = YES;
 							
@@ -8472,7 +8755,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 									if( vv < 1.0 && vv != 0.0)
 									{
 										if( fabs( pp) < 1.0 && pp != 0.0)
-											[tempString appendFormat: NSLocalizedString( @"Thickness: %0.2f %cm Location: %0.2f %cm", nil), fabs( vv * 1000.0), 0xB5, pp * 1000.0, 0xB5];
+											[tempString appendFormat: NSLocalizedString( @"Thickness: %0.2f %cm Location: %0.2f %cm", @"Warning %cm is NOT 'centimeter', it's micro-meter : only convert the m, not the '%c', which is the greek letter Mu"), fabs( vv * 1000.0), 0xB5, pp * 1000.0, 0xB5];
 										else
 											[tempString appendFormat: NSLocalizedString( @"Thickness: %0.2f %cm Location: %0.2f mm", nil), fabs( vv * 1000.0), 0xB5, pp];
 									}
@@ -8484,7 +8767,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 									if (curDCM.sliceThickness < 1.0 && curDCM.sliceThickness != 0.0)
 									{
 										if( fabs( curDCM.sliceLocation) < 1.0 && curDCM.sliceLocation != 0.0)
-											[tempString appendFormat: NSLocalizedString( @"Thickness: %0.2f %cm Location: %0.2f %cm", nil), curDCM.sliceThickness * 1000.0, 0xB5, curDCM.sliceLocation * 1000.0, 0xB5];
+											[tempString appendFormat: NSLocalizedString( @"Thickness: %0.2f %cm Location: %0.2f %cm", @"Warning %cm is NOT 'centimeter', it's micro-meter : only convert the m, not the '%c', which is the greek letter Mu"), curDCM.sliceThickness * 1000.0, 0xB5, curDCM.sliceLocation * 1000.0, 0xB5];
 										else
 											[tempString appendFormat: NSLocalizedString( @"Thickness: %0.2f %cm Location: %0.2f mm", nil), curDCM.sliceThickness * 1000.0, 0xB5, curDCM.sliceLocation];
 									}
@@ -8502,14 +8785,14 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 								 }	 
 							}
 						}
-						else if( [[annot objectAtIndex:j] isEqualToString: @"PatientName"])
+						else if( [a isEqualToString: @"PatientName"])
 						{
-							if( annotFull == annotationType && [[dcmFilesList objectAtIndex: 0] valueForKeyPath:@"series.study.name"])
-								[tempString appendString: [[dcmFilesList objectAtIndex: 0] valueForKeyPath:@"series.study.name"]];
+							if( annotFull == annotationType && self.studyObj.name)
+								[tempString appendString: self.studyObj.name];
 						}
 						else if( fullText)
 						{
-							[tempString appendFormat:@" %@", [annot objectAtIndex:j]];
+							[tempString appendFormat:@" %@", a];
 							useStringTexture = YES;
 						}					
 					}
@@ -8574,40 +8857,6 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 		xRaster = size.origin.x + size.size.width-2;
 		if( fullText)
 			[self DrawNSStringGL: @"Made In OsiriX" :fontList :xRaster :yRaster rightAlignment:YES useStringTexture:YES];
-     }
-    
-    if( size.size.width > 500*sf && [AppController isFDACleared] == NO)
-    {
-        if( warningNotice == nil && [self class] == [DCMView class] && fullText)
-        {
-            NSMutableDictionary *stanStringAttrib = [NSMutableDictionary dictionary];
-            [stanStringAttrib setObject: [NSFont fontWithName:@"Helvetica" size: 17] forKey: NSFontAttributeName];
-            if( whiteBackground)
-                [stanStringAttrib setObject: [NSColor colorWithDeviceRed:0.2f green:0.2 blue:0.2 alpha: 1.0] forKey: NSForegroundColorAttributeName];
-            else
-                [stanStringAttrib setObject: [NSColor colorWithDeviceRed:1.0f green:0.8 blue:0.8 alpha: 1.0] forKey: NSForegroundColorAttributeName];
-            NSString *s = NSLocalizedString( @"NOT FOR MEDICAL USAGE", nil);
-            if( [[s stringByReplacingOccurrencesOfString:@" " withString:@""] stringByTrimmingCharactersInSet: [NSCharacterSet whitespaceAndNewlineCharacterSet]].length < 5)
-                s = @"NOT FOR MEDICAL USAGE";
-            
-            NSAttributedString *text = [[[NSAttributedString alloc] initWithString:s  attributes: stanStringAttrib] autorelease];
-            
-            if( text.size.width <= 100) {
-                s = [NSString stringWithFormat: @"%s %s %s %s", "NOT", "FOR", "MEDICAL", "USAGE"];
-                text = [[[NSAttributedString alloc] initWithString:s  attributes: stanStringAttrib] autorelease];
-            }
-            
-            warningNotice = [[GLString alloc] initWithAttributedString: text withBoxColor: [NSColor colorWithDeviceRed:1.0f green:0.f blue: 0.f alpha:0.4f] withBorderColor: [NSColor colorWithDeviceRed:1.0f green:0.f blue: 0.f alpha:1.0f]];
-        }
-        
-        if( warningNotice)
-        {
-            glColor4f( 1.0, 1.0, 1.0, 1.0);
-            
-            NSRect r = NSMakeRect( size.origin.x + size.size.width/2 - [self convertSizeToBacking: [warningNotice frameSize]].width/2, size.origin.y + size.size.height - 35*sf - [self convertSizeToBacking: [warningNotice frameSize]].height, [self convertSizeToBacking: [warningNotice frameSize]].width, [self convertSizeToBacking: [warningNotice frameSize]].height);
-            
-            [warningNotice drawWithBounds: r];
-        }
     }
 }
 
@@ -8627,8 +8876,21 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 #pragma mark-
 #pragma mark image transformation
 
+- (void) loadOpenGLIdentityForDrawingFrame: (NSRect) r
+{
+    CGLContextObj cgl_ctx = [[NSOpenGLContext currentContext] CGLContextObj];
+    if( cgl_ctx == nil)
+        return;
+    
+    glLoadIdentity ();
+    glViewport(0, 0, r.size.width, r.size.height);
+    glScalef(2.0f /(xFlipped ? -(r.size.width) : r.size.width), -2.0f / (yFlipped ? -(r.size.height) : r.size.height), 1.0f);
+    glRotatef( rotation, 0.0f, 0.0f, 1.0f); // rotate matrix for image rotation
+    glTranslatef( origin.x, -origin.y, 0.0f);
+    glScalef( 1.f, curDCM.pixelRatio, 1.f);
+}
 
-- (void) applyImageTransformation
+- (void) applyImageTransformation __deprecated
 {
 	CGLContextObj cgl_ctx = [[NSOpenGLContext currentContext] CGLContextObj];
     if( cgl_ctx == nil)
@@ -8643,16 +8905,28 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	glScalef( 1.f, curDCM.pixelRatio, 1.f);
 }
 
+static int hasYosemite = -1;
+
 - (void) drawRect:(NSRect) r
 {
 	if( drawing == NO) return;
 	
+//    // Yosemite slow updates workaround :
+//    if( hasYosemite == -1)
+//        hasYosemite = [AppController hasOSXYosemite];
+//    
+//    if( hasYosemite)
+//        NSDisableScreenUpdates();
+    // ********************************
+    
 	@synchronized (self)
 	{
         NSRect backingBounds = [self convertRectToBacking: [self frame]]; // Retina
         
         if( previousScalingFactor != self.window.backingScaleFactor && self.window.backingScaleFactor != 0)
         {
+//            self.layer.contentsScale = self.window.backingScaleFactor;
+            
             if( previousScalingFactor)
             {
                 scaleValue *= self.window.backingScaleFactor / previousScalingFactor;
@@ -8669,7 +8943,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
             [[NSNotificationCenter defaultCenter] postNotificationName: OsirixGLFontChangeNotification object: self];
             
             for( ROI *r in curRoiList)
-                [r setRoiView :self];
+                r.curView = self;
         }
         
 		[self drawRect: backingBounds withContext: [self openGLContext]];
@@ -9024,9 +9298,9 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 					glEnable(GL_BLEND);
 					
                     if( gInvertColors)
-                        glColor4f ( 0, 0, 0, [[self windowController] highLighted]);
+                        glColor4f ( 0, 0, 0, [[self windowController] highLighted]); // Yellow square, fading
                     else
-                        glColor4f (249./255., 240./255., 140./255., [[self windowController] highLighted]);
+                        glColor4f (0.5, 0.0, 0.0, [[self windowController] highLighted]);  // color square, fading
 					glLineWidth(1.0 * sf);
 					glBegin(GL_QUADS);
 						glVertex2f(0.0, 0.0);
@@ -9254,7 +9528,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 				{
 					// draw line around key View - RED BOX
 					
-					if( isKeyView && (frontMost || [ViewerController frontMostDisplayed2DViewerForScreen: self.window.screen] == self.windowController))
+					if( isKeyView && [ViewerController frontMostDisplayed2DViewerForScreen: self.window.screen] == self.windowController)
 					{
                         if( [[self windowController] FullScreenON] == FALSE)
                         {
@@ -9353,7 +9627,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 					
                     // KEY VIEW - RED BOX
                     
-					if( isKeyView && (frontMost || [ViewerController frontMostDisplayed2DViewerForScreen: self.window.screen] == self.windowController))
+					if( isKeyView && [ViewerController frontMostDisplayed2DViewerForScreen: self.window.screen] == self.windowController)
 					{
 						float heighthalf = drawingFrameRect.size.height/2 - 1;
 						float widthhalf = drawingFrameRect.size.width/2 - 1;
@@ -9385,20 +9659,21 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 					BOOL resetData = NO;
 					if(_imageColumns > 1 || _imageRows > 1) resetData = YES;	//For alias ROIs
 					
-					NSSortDescriptor * roiSorting = [[[NSSortDescriptor alloc] initWithKey:@"uniqueID" ascending:NO] autorelease];
-					
 					rectArray = [[NSMutableArray alloc] initWithCapacity: [curRoiList count]];
 					
-					for( int i = (long)[curRoiList count]-1; i >= 0; i--)
-					{
-						ROI *r = [[curRoiList objectAtIndex:i] retain];	// If we are not in the main thread (iChat), we want to be sure to keep our ROIs
-						
-						if( resetData) [r recompute];
-						[r setRoiView :self];
-						[r drawROI: scaleValue : curDCM.pwidth / 2. : curDCM.pheight / 2. : curDCM.pixelSpacingX : curDCM.pixelSpacingY];
-						
-						[r release];
-					}
+                    if( [curRoiList count] > 0)
+                    {
+                        for( int i = (long)[curRoiList count]-1; i >= 0; i--)
+                        {
+                            ROI *r = [[curRoiList objectAtIndex:i] retain];	// If we are not in the main thread (iChat), we want to be sure to keep our ROIs
+                            
+                            if( resetData) [r recompute];
+                            r.curView = self;
+                            [r drawROI: scaleValue : curDCM.pwidth / 2. : curDCM.pheight / 2. : curDCM.pixelSpacingX : curDCM.pixelSpacingY];
+                            
+                            [r release];
+                        }
+                    }
 					
                     // let the pluginSDK draw anything it needs to draw, we use a notification for now, but that is nasty style, we really should be calling a method
 #ifndef OSIRIX_LIGHT
@@ -9407,7 +9682,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
                     
 					if ( !suppress_labels)
 					{
-						NSArray	*sortedROIs = [curRoiList sortedArrayUsingDescriptors: [NSArray arrayWithObject: roiSorting]];
+						NSArray	*sortedROIs = [curRoiList sortedArrayUsingDescriptors: [NSArray arrayWithObject: [NSSortDescriptor sortDescriptorWithKey:@"uniqueID" ascending:NO]]];
 						
 						BOOL drawingRoiMode = NO;
 						for( ROI *r in sortedROIs)
@@ -9535,7 +9810,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 						
 						tempPoint3D[0] -= curDCM.pwidth * 0.5f;
 						tempPoint3D[1] -= curDCM.pheight * 0.5f;
-
+                        
 						glColor3f (0.0f, 0.6f, 0.0f);
 						glLineWidth(2.0 * sf);
 
@@ -9786,13 +10061,6 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 					glMatrixMode (GL_PROJECTION);
 				glPopMatrix();
 			}
-		}  
-		else
-		{
-			//no valid image  ie curImage = -1
-			//NSLog(@"****** No Image");
-			glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-			glClear (GL_COLOR_BUFFER_BIT);
 		}
 		
 	#ifndef new_loupe
@@ -10055,8 +10323,24 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
     previousViewSize = frameRect.size;
 }
 
+- (void)renewGState
+{
+    // Called whenever graphics state updated (such as window resize)
+    
+    // OpenGL rendering is not synchronous with other rendering on the OSX.
+    // Therefore, call disableScreenUpdatesUntilFlush so the window server
+    // doesn't render non-OpenGL content in the window asynchronously from
+    // OpenGL content, which could cause flickering.  (non-OpenGL content
+    // includes the title bar and drawing done by the app with other APIs)
+    [[self window] disableScreenUpdatesUntilFlush];
+    
+    [super renewGState];
+}
+
 - (void) reshape	// scrolled, moved or resized
 {
+    [super reshape];
+    
 	if( dcmPixList)
     {
 		BOOL is2DViewer = [self is2DViewer];
@@ -10086,7 +10370,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 							{
 								if( pix != curDCM)
 								{
-                                    [pix.imageObj setValue: nil forKey: @"scale"];
+                                    pix.imageObj.scale = nil;
 									
 									NSPoint o = NSMakePoint( 0, 0);
 									
@@ -10096,8 +10380,8 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 										o.y = -((curDCM.pheight * 0.5f ) - ( curDCM.shutterRect.origin.y + ( curDCM.shutterRect.size.height * 0.5f ))) * scaleValue;
 									}
 									
-									[pix.imageObj setValue: [NSNumber numberWithFloat: o.x] forKey:@"xOffset"];
-									[pix.imageObj setValue: [NSNumber numberWithFloat: o.y] forKey:@"yOffset"];
+									pix.imageObj.xOffset = @(o.x);
+									pix.imageObj.yOffset = @(o.y);
 								}
 							}
 						}
@@ -10135,12 +10419,12 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
                                 {
                                     if( pix !=  curDCM)
                                     {
-                                        float s = [[pix.imageObj valueForKey: @"scale"] floatValue];
+                                        float s = [pix.imageObj.scale floatValue];
                                         
                                         if( s)
-                                            [pix.imageObj setValue: [NSNumber numberWithFloat: s * yChanged] forKey: @"scale"];
+                                            pix.imageObj.scale = @( s * yChanged);
                                         else
-                                            [pix.imageObj setValue: nil forKeyPath: @"scale"];
+                                            pix.imageObj.scale = nil;
                                     }
                                 }
                             }
@@ -10164,8 +10448,6 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 			}
 		}
     }
-	
-	[super reshape];
 }
 
 -(unsigned char*) getRawPixels:(long*) width :(long*) height :(long*) spp :(long*) bpp :(BOOL) screenCapture :(BOOL) force8bits
@@ -10238,13 +10520,44 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	
 	if( [views count] > 1 && [views count] == [viewsRect count])
 	{
-		unsigned char	*tempData = nil;
+		unsigned char *tempData = nil;
 		
+//        NSString *studyInstanceUID = [[views.lastObject studyObj] studyInstanceUID];
+//        NSString *patientUID = [[views.lastObject studyObj] patientUID];
+//        int annotationsType  = [views.lastObject annotationType];
+//        BOOL annotationsChanged = NO;
+//        
+//        if( [self is2DViewer])
+//        {
+//            // Is it same study / patient? If not, display annotations for study date, patient ID
+//            for( DCMView *v in views)
+//            {
+//                if( [v.studyObj.studyInstanceUID isEqualToString: studyInstanceUID] == NO)
+//                {
+//                    if( annotationsType < annotBase)
+//                    {
+//                        annotationsChanged = YES;
+//                        [DCMView setCLUTBARS: CLUTBARS ANNOTATIONS: annotBase];
+//                    }
+//                }
+//                
+//                if( [v.studyObj.patientUID isEqualToString: patientUID] == NO)
+//                {
+//                    if( annotationsType < annotFull)
+//                    {
+//                        annotationsChanged = YES;
+//                        [DCMView setCLUTBARS: CLUTBARS ANNOTATIONS: annotFull];
+//                        break;
+//                    }
+//                }
+//            }
+//        }
+        
 		NSRect unionRect = [[viewsRect objectAtIndex: 0] rectValue];
 		for( NSValue *rect in viewsRect)
 			unionRect = NSUnionRect( [rect rectValue], unionRect);
 		
-		for( int i = 0; i < [views count]; i++ )
+		for( int i = 0; i < [views count]; i++)
 		{
 			NSRect curRect = [[viewsRect objectAtIndex: i] rectValue];
 			BOOL intersect;
@@ -10414,6 +10727,9 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
             }
 		}
 		
+//        if( annotationsChanged)
+//            [DCMView setCLUTBARS: CLUTBARS ANNOTATIONS: annotationType];
+        
 		return data;
 	}
 	else
@@ -10514,6 +10830,13 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 		#endif
 		[self class] == [OrthogonalMPRView class]) allowSmartCropping = NO;	// <- MPR 2D, Ortho MPR
 	
+    
+    BOOL z = self.translatesAutoresizingMaskIntoConstraints;
+    BOOL zz = self.blendingView.translatesAutoresizingMaskIntoConstraints;
+    
+    if( !z) self.translatesAutoresizingMaskIntoConstraints = YES; // to avoid a bug when exporting ortho MPR with PET-CT
+    if( !zz) self.blendingView.translatesAutoresizingMaskIntoConstraints = YES; // to avoid a bug when exporting ortho MPR with PET-CT
+    
 	if( screenCapture)	// Pixels displayed in current window
 	{
 		for( ROI *r in curRoiList)	[r setROIMode: ROI_sleep];
@@ -10540,7 +10863,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 //                if( self.blendingView)
 //                {
 //                    blendedViewRect = [self.blendingView smartCrop: &blendedShiftOrigin];
-//                    NSRect unionRect = NSUnionRect( blendedViewRect, smartCroppedRect);;
+//                    NSRect unionRect = NSUnionRect( blendedViewRect, smartCroppedRect);
 //                    
 //                    #define NSRectCenterX(r) (r.origin.x+r.size.width/2.)
 //                    #define NSRectCenterY(r) (r.origin.y+r.size.height/2.)
@@ -10645,11 +10968,8 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
                     
                     screenCaptureRect = NSMakeRect(0, 0, 0, 0);
                 
-                    if( str)
-                    {
-                        [self setStringID: str];
-                        [str release];
-                    }
+                    [self setStringID: str];
+                    [str release];
                 
                     [self setNeedsDisplay: YES];	// for refresh, later
                 }
@@ -10724,7 +11044,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 				
 				float slope = 1;
 				
-				if( [[[dcmFilesList objectAtIndex: curImage] valueForKey:@"modality"] isEqualToString:@"PT"] == YES)
+				if( [self.imageObj.modality isEqualToString:@"PT"] == YES)
 					slope = im.appliedFactorPET2SUV * im.slope;
 				
 				if( buf)
@@ -10881,7 +11201,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 					
 					float slope = 1;
 					
-					if( [[[dcmFilesList objectAtIndex: curImage] valueForKey:@"modality"] isEqualToString:@"PT"] == YES)
+					if( [self.imageObj.modality isEqualToString:@"PT"] == YES)
 						slope = dcm.appliedFactorPET2SUV * dcm.slope;
 					
 					long i = *width * *height * *spp * *bpp / 8;
@@ -10951,10 +11271,13 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 						vImageConvert_RGB888toARGB8888( &srcVimage, nil, 0, &argbsrcVimage, 0, 0);
 						vImageScale_ARGB8888( &argbsrcVimage, &argbdstVimage, nil, kvImageHighQualityResampling);
 						vImageConvert_ARGB8888toRGB888( &argbdstVimage, &dstVimage, 0);
-						
+                    }
+                    
+                    if( argbsrcVimage.data)
 						free( argbsrcVimage.data);
+                    
+                    if( argbdstVimage.data)
 						free( argbdstVimage.data);
-					}
 				}
 				else
 				{
@@ -10962,7 +11285,8 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 						vImageScale_Planar8( &srcVimage, &dstVimage, nil, kvImageHighQualityResampling);
 				}
 				
-				free( buf);
+                if( buf)
+                    free( buf);
 				
 				if( imSpacing)
 					imSpacing[ 1] = imSpacing[ 0];
@@ -10972,6 +11296,9 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 			}
 		}
 	}
+    
+    if( !z) self.translatesAutoresizingMaskIntoConstraints = z;
+    if( !zz) self.blendingView.translatesAutoresizingMaskIntoConstraints = zz;
 	
 	return buf;
 }
@@ -11094,6 +11421,11 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 
 - (NSDictionary*) exportDCMCurrentImage: (DICOMExport*) exportDCM size:(int) size  views: (NSArray*) views viewsRect: (NSArray*) viewsRect exportSpacingAndOrigin: (BOOL) exportSpacingAndOrigin
 {
+    return [self exportDCMCurrentImage: exportDCM size: size views: views viewsRect: viewsRect exportSpacingAndOrigin: exportSpacingAndOrigin force8bits: YES];
+}
+
+- (NSDictionary*) exportDCMCurrentImage: (DICOMExport*) exportDCM size:(int) size  views: (NSArray*) views viewsRect: (NSArray*) viewsRect exportSpacingAndOrigin: (BOOL) exportSpacingAndOrigin force8bits:(BOOL) force8bits
+{
 	NSString *f = nil;
 	float o[ 9], imOrigin[ 3], imSpacing[ 2];
 	long width, height, spp, bpp;
@@ -11107,7 +11439,9 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 		[DCMView setCLUTBARS: barHide ANNOTATIONS: annotGraphics];
 	
 	unsigned char *data = nil;
-	
+    int offset = 0;
+    BOOL isSigned = NO;
+    
 	if( [views count] > 1 && [views count] == [viewsRect count])
 	{
 		data = [self getRawPixelsWidth: &width
@@ -11134,14 +11468,14 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 								spp: &spp
 								bpp: &bpp
 					  screenCapture: YES
-						 force8bits: YES
+						 force8bits: force8bits
 					removeGraphical: YES
 					   squarePixels: YES
 				 allowSmartCropping: NO
 							 origin: imOrigin
 							spacing: imSpacing
-							 offset: nil
-						   isSigned: nil];
+							 offset: &offset
+						   isSigned: &isSigned];
 	}
 	
 	if( data)
@@ -11149,7 +11483,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 		if( size)
 		{
 			if( spp != 3)
-				NSLog( @"********* spp != 3 I'll NOT resize");
+				NSLog( @"---- spp != 3 I'll NOT resize");
 			else
 			{
 				unsigned char *cropData;
@@ -11229,8 +11563,10 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 			}
 		}
 		
-		[exportDCM setSourceFile: [self.imageObj valueForKey:@"completePath"]];
-		
+		[exportDCM setSourceDicomImage: self.imageObj];
+        [exportDCM setOffset: offset];
+        [exportDCM setSigned: isSigned];
+        
 		float thickness, location;
 		
 		[self getThickSlabThickness:&thickness location:&location];
@@ -11249,7 +11585,6 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 			[exportDCM setPixelSpacing: imSpacing[ 0] :imSpacing[ 1]];
 		}
 		[exportDCM setPixelData: data samplesPerPixel:spp bitsPerSample:bpp width: width height: height];
-		[exportDCM setModalityAsSource: NO];
 		
 		f = [exportDCM writeDCMFile: nil withExportDCM: dcmExportPlugin];
 		if( f == nil) NSRunCriticalAlertPanel( NSLocalizedString(@"Error", nil),  NSLocalizedString(@"Error during the creation of the DICOM File!", nil), NSLocalizedString(@"OK", nil), nil, nil);
@@ -11470,16 +11805,17 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 		{
             // Series Level
             if( [self isScaledFit] == NO)
-                [self.seriesObj setValue:[NSNumber numberWithFloat: scaleValue / sqrt( [self frame].size.height * [self frame].size.width)] forKey:@"scale"];
+                self.seriesObj.scale = @( scaleValue / sqrt( [self frame].size.height * [self frame].size.width));
             else
-                [self.seriesObj setValue: nil forKeyPath: @"scale"];
-            [self.seriesObj setValue:[NSNumber numberWithInt: 3] forKey: @"displayStyle"];
+                self.seriesObj.scale = nil;
+            
+            self.seriesObj.displayStyle = @( 3);
             
             // Image Level
             if( curImage >= 0 && COPYSETTINGSINSERIES == NO && [self isScaledFit] == NO)
-                [self.imageObj setValue:[NSNumber numberWithFloat:scaleValue] forKey:@"scale"];
+                self.imageObj.scale = @(scaleValue);
             else
-                [self.imageObj setValue: nil forKey:@"scale"];
+                self.imageObj.scale = nil;
 		}
 		
 		[self updateTilingViews];
@@ -11513,17 +11849,17 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
                 @try {
                     // Series Level
                     if( [self isScaledFit] == NO)
-                        [self.seriesObj setValue:[NSNumber numberWithFloat: scaleValue / sqrt( [self frame].size.height * [self frame].size.width)] forKey:@"scale"];
+                        self.seriesObj.scale = @( scaleValue / sqrt( [self frame].size.height * [self frame].size.width));
                     else
-                        [self.seriesObj setValue: nil forKey:@"scale"];
+                        self.seriesObj.scale = nil;
                     
-                    [self.seriesObj setValue:[NSNumber numberWithInt: 3] forKey: @"displayStyle"];
+                    self.seriesObj.displayStyle = @( 3);
                     
                     // Image Level
                     if( curImage >= 0 && COPYSETTINGSINSERIES == NO && [self isScaledFit] == NO)
-                        [self.imageObj setValue:[NSNumber numberWithFloat:scaleValue] forKey:@"scale"];
+                        self.imageObj.scale = @( scaleValue);
                     else
-                        [self.imageObj setValue: nil forKey:@"scale"];
+                        self.imageObj.scale = nil;
                 }
                 @catch ( NSException *e) {
                     N2LogException( e);
@@ -11647,13 +11983,13 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 		if( rotation < 0) rotation += 360;
 		if( rotation > 360) rotation -= 360;
 		
-        [self.seriesObj setValue:[NSNumber numberWithFloat:rotation] forKey:@"rotationAngle"];
+        self.seriesObj.rotationAngle = @(rotation);
         
         // Image Level
         if( curImage >= 0 && COPYSETTINGSINSERIES == NO)
-            [self.imageObj setValue:[NSNumber numberWithFloat:rotation] forKey:@"rotationAngle"];
+            self.imageObj.rotationAngle = @(rotation);
         else
-            [self.imageObj setValue: nil forKey:@"rotationAngle"];
+            self.imageObj.rotationAngle = nil;
 		
 		[self updateTilingViews];
         
@@ -11789,19 +12125,19 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
         if( [self is2DViewer] == YES && [[self windowController] isPostprocessed] == NO)
         {
             // Series Level
-            [self.seriesObj setValue:[NSNumber numberWithFloat:x] forKey:@"xOffset"];
-            [self.seriesObj setValue:[NSNumber numberWithFloat:y] forKey:@"yOffset"];
+            self.seriesObj.xOffset = @(x);
+            self.seriesObj.yOffset = @(y);
             
             // Image Level
             if( curImage >= 0 && COPYSETTINGSINSERIES == NO)
             {
-                [self.imageObj setValue:[NSNumber numberWithFloat:x] forKey:@"xOffset"];
-                [self.imageObj setValue:[NSNumber numberWithFloat:y] forKey:@"yOffset"];
+                self.imageObj.xOffset = @(x);
+                self.imageObj.yOffset = @(y);
             }
             else
             {
-                [self.imageObj setValue: nil forKey:@"xOffset"];
-                [self.imageObj setValue: nil forKey:@"yOffset"];
+                self.imageObj.xOffset = nil;
+                self.imageObj.yOffset = nil;
             }
         }
     }
@@ -12040,12 +12376,12 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	*tH = curDCM.pheight;
 	
 	zoomIsSoftwareInterpolated = NO;
-	
+    
+	resampledScale = 1.0;
 	if( [self softwareInterpolation])
 	{
 		zoomIsSoftwareInterpolated = YES;
 		
-		float resampledScale;
 		if( curDCM.pwidth <= 256) resampledScale = 3;
 		else resampledScale = 2;
 		
@@ -12544,6 +12880,13 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 
 - (BOOL)becomeFirstResponder
 {
+    // Trackpad support
+    if( [self is2DViewer])
+    {
+        [self setAcceptsTouchEvents:YES];
+        [self setWantsRestingTouches:YES]; // for thumb
+    }
+    
 	isKeyView = YES;
 	
 	[self updateTilingViews];
@@ -12619,6 +12962,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
              object: nil];
         
         [self.window makeFirstResponder: self];
+        [self.window setAcceptsMouseMovedEvents: YES];
     }
     return self;
 
@@ -12820,7 +13164,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	}
 }
 
--(void) setCursorForView: (ToolMode) tool
+-(void) setCursorForView: (long) tool
 {
 	NSCursor	*c;
 	
@@ -12907,7 +13251,9 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 			NSLog( @"screen pixel ratio: %f", fabs( (f.width/r.size.width) - (f.height/r.size.height)));
 			if( fabs( (f.width/r.size.width) - (f.height/r.size.height)) < 0.01)
 			{
-				[self setScaleValue: curDCM.pixelSpacingX / (f.width/r.size.width)];
+                
+                
+				[self setScaleValue: curDCM.pixelSpacingX / (f.width/(r.size.width*self.window.backingScaleFactor))];
 			}
 			else
 			{
@@ -12955,6 +13301,9 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
         if( [NSThread isMainThread] == NO)
             NSLog( @"******************* warning this object should be used only on the main thread. Create your own Context !");
 #endif
+        if( [stringID isEqualToString:@"previewDatabase"])
+            return curDCM.imageObj;
+        
         if( curImage >= 0 && curImage < dcmFilesList.count)
             return [dcmFilesList objectAtIndex: curImage];
         
@@ -13013,22 +13362,22 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 
 - (void) updatePresentationStateFromSeriesOnlyImageLevel: (BOOL) onlyImage scale: (BOOL) scale offset: (BOOL) offset
 {
-	NSManagedObject *series = self.seriesObj;
-	NSManagedObject *image = self.imageObj;
+	DicomSeries *series = self.seriesObj;
+	DicomImage *image = self.imageObj;
 	
 	if( series)
 	{
-		if( [image valueForKey:@"xFlipped"])
-			self.xFlipped = [[image valueForKey:@"xFlipped"] boolValue];
+		if( image.xFlipped)
+			self.xFlipped = [image.xFlipped boolValue];
 		else if( !onlyImage)
-			self.xFlipped = [[series valueForKey:@"xFlipped"] boolValue];
+			self.xFlipped = [series.xFlipped boolValue];
 		else
 			self.xFlipped = NO;
 			
-		if( [image valueForKey:@"yFlipped"])
-			self.yFlipped = [[image valueForKey:@"yFlipped"] boolValue];
+		if( image.xFlipped)
+			self.yFlipped = [image.yFlipped boolValue];
 		else if( !onlyImage)
-			self.yFlipped = [[series valueForKey:@"yFlipped"] boolValue];
+			self.yFlipped = [series.yFlipped boolValue];
 		else
 			self.yFlipped = NO;
 		
@@ -13036,25 +13385,25 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
         {
             if((scale && [[NSUserDefaults standardUserDefaults] boolForKey:@"AlwaysScaleToFit"] == NO) || COPYSETTINGSINSERIES == NO)
             {
-                if( [image valueForKey:@"scale"])
+                if( image.scale)
                 {
-                    if( [[image valueForKey:@"scale"] floatValue] != 0)
-                        [self setScaleValue: [[image valueForKey:@"scale"] floatValue]];
+                    if( [image.scale floatValue] != 0)
+                        [self setScaleValue: [image.scale floatValue]];
                     else
                         [self scaleToFit];
                 }
                 else if( !onlyImage)
                 {
-                    if( [series valueForKey:@"scale"])
+                    if( series.scale)
                     {
-                        if( [[series valueForKey:@"scale"] floatValue] != 0)
+                        if( [series.scale floatValue] != 0)
                         {
-                            if( [[series valueForKey:@"displayStyle"] intValue] == 3)
-                                [self setScaleValue: [[series valueForKey:@"scale"] floatValue] * sqrt( [self frame].size.height * [self frame].size.width)];
-                            else if( [[series valueForKey:@"displayStyle"] intValue] == 2)
-                                [self setScaleValue: [[series valueForKey:@"scale"] floatValue] * [self frame].size.width];
+                            if( [series.displayStyle intValue] == 3)
+                                [self setScaleValue: [series.scale floatValue] * sqrt( [self frame].size.height * [self frame].size.width)];
+                            else if( [series.displayStyle intValue] == 2)
+                                [self setScaleValue: [series.scale floatValue] * [self frame].size.width];
                             else
-                                [self setScaleValue: [[series valueForKey:@"scale"] floatValue]];
+                                [self setScaleValue: [series.scale floatValue]];
                         }
                         else
                             [self scaleToFit];
@@ -13071,10 +13420,10 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
         else
             [self scaleToFit];
 		
-		if( [image valueForKey:@"rotationAngle"])
-			[self setRotation: [[image valueForKey:@"rotationAngle"] floatValue]];
+		if( image.rotationAngle)
+			[self setRotation: [image.rotationAngle floatValue]];
 		else if( !onlyImage)
-			[self setRotation:  [[series valueForKey:@"rotationAngle"] floatValue]];
+			[self setRotation:  [series.rotationAngle floatValue]];
 		else
 			[self setRotation: 0];
 		
@@ -13084,11 +13433,11 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
             {
                 NSPoint o = NSMakePoint( HUGE_VALF, HUGE_VALF);
                 
-                if( [image valueForKey:@"xOffset"])  o.x = [[image valueForKey:@"xOffset"] floatValue];
-                else if( !onlyImage) o.x = [[series valueForKey:@"xOffset"] floatValue];
+                if( image.xOffset)  o.x = [image.xOffset floatValue];
+                else if( !onlyImage) o.x = [series.xOffset floatValue];
                 
-                if( [image valueForKey:@"yOffset"])  o.y = [[image valueForKey:@"yOffset"] floatValue];
-                else if( !onlyImage) o.y = [[series valueForKey:@"yOffset"] floatValue];
+                if( image.yOffset)  o.y = [image.yOffset floatValue];
+                else if( !onlyImage) o.y = [series.yOffset floatValue];
                 
                 if( o.x != HUGE_VALF && o.y != HUGE_VALF)
                     [self setOrigin: o];
@@ -13097,13 +13446,17 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 		
 		float ww = 0, wl = 0;
 		
-        if( [image valueForKey:@"windowWidth"]) ww = [[image valueForKey:@"windowWidth"] floatValue];
-        else if( !onlyImage && [series valueForKey:@"windowWidth"]) ww = [[series valueForKey:@"windowWidth"] floatValue];
+        if( image.windowWidth)
+            ww = [image.windowWidth floatValue];
+        else if( !onlyImage && series.windowWidth)
+            ww = [series.windowWidth floatValue];
         else if( ![self is2DViewer])
             ww = curWW;
         
-        if( [image valueForKey:@"windowLevel"]) wl = [[image valueForKey:@"windowLevel"] floatValue];
-        else if( !onlyImage && [series valueForKey:@"windowLevel"]) wl= [[series valueForKey:@"windowLevel"] floatValue];
+        if( image.windowLevel)
+            wl = [image.windowLevel floatValue];
+        else if( !onlyImage && series.windowLevel)
+            wl = [series.windowLevel floatValue];
         else if( ![self is2DViewer])
             wl = curWL;
 		
@@ -13125,7 +13478,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 		{
 			if( ww != 0.0)
 			{
-				if( [[[dcmFilesList objectAtIndex: curImage] valueForKey:@"modality"] isEqualToString:@"PT"] || ([[NSUserDefaults standardUserDefaults] boolForKey:@"mouseWindowingNM"] == YES && [[[dcmFilesList objectAtIndex: curImage] valueForKey:@"modality"] isEqualToString:@"NM"] == YES))
+				if( [self.imageObj.modality isEqualToString:@"PT"] || ([[NSUserDefaults standardUserDefaults] boolForKey:@"mouseWindowingNM"] == YES && [self.imageObj.modality isEqualToString:@"NM"] == YES))
 				{
 					float from, to;
 					
@@ -13189,7 +13542,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 		}
 		else if( onlyImage == NO)
 		{
-			if( [[[dcmFilesList objectAtIndex: curImage] valueForKey:@"modality"] isEqualToString:@"PT"] || ([[NSUserDefaults standardUserDefaults] boolForKey:@"mouseWindowingNM"] == YES && [[[dcmFilesList objectAtIndex: curImage] valueForKey:@"modality"] isEqualToString:@"NM"] == YES))
+			if( [self.imageObj.modality isEqualToString:@"PT"] || ([[NSUserDefaults standardUserDefaults] boolForKey:@"mouseWindowingNM"] == YES && [self.imageObj.modality isEqualToString:@"NM"] == YES))
 			{
 				float from, to;
 				
@@ -13359,7 +13712,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
             image = [self nsimage: NO];
             
         // Thumbnail image and position
-        NSPoint event_location = [event locationInWindow];
+        NSPoint event_location = event.locationInWindow;
         NSPoint local_point = [self convertPoint:event_location fromView:nil];
         local_point.x -= 35;
         local_point.y -= 35;
@@ -13379,7 +13732,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
         [pbTypes addObject: NSFilenamesPboardType];
         [pbTypes addObject: NSTIFFPboardType];
         
-        if( [self dicomImage])
+        if( [self imageObj])
         {
             [pbTypes addObject: pasteBoardOsiriX];
             [pboard declareTypes:pbTypes owner:self];
@@ -13393,17 +13746,17 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
         
         [pboard setData: [image TIFFRepresentation] forType: NSTIFFPboardType];
         
-        NSString *description = [[self dicomImage] valueForKeyPath:@"series.name"];
+        NSString *description = self.seriesObj.name;
         
         if( description.length == 0)
-            description = [[self dicomImage] valueForKeyPath:@"series.seriesDescription"];
+            description = self.seriesObj.seriesDescription;
         
         NSString *path = [[NSFileManager defaultManager] tmpDirPath];
         
         if( description.length)
-            path = [path stringByAppendingPathComponent: [NSString stringWithFormat: @"%@ - %@", [[self dicomImage] valueForKeyPath:@"series.study.name"], description]];
+            path = [path stringByAppendingPathComponent: [NSString stringWithFormat: @"%@ - %@", self.studyObj.name, description]];
         else
-            path = [path stringByAppendingPathComponent: [[self dicomImage] valueForKeyPath:@"series.study.name"]];
+            path = [path stringByAppendingPathComponent: self.studyObj.name];
         
         path = [path stringByAppendingPathExtension: @"jpg"];
         [[NSFileManager defaultManager] removeItemAtPath: path error: nil];
@@ -13435,10 +13788,6 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 //part of Dragging Source Protocol
 - (NSDragOperation)draggingSourceOperationMaskForLocal:(BOOL)isLocal{
 	return NSDragOperationEvery;
-}
-
-- (id)dicomImage{
-	return [dcmFilesList objectAtIndex: curImage];
 }
 
 #pragma mark -
@@ -13790,7 +14139,7 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 #pragma mark Window Controler methods.
 - (id) windowController
 {
-	return [[self window] windowController];
+	return self.window.windowController;
 }
 
 - (BOOL) is2DViewer

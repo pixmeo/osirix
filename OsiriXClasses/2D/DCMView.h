@@ -22,49 +22,13 @@
 #include <OpenGL/CGLCurrent.h>
 #include <OpenGL/CGLContext.h>
 #import "N3Geometry.h"
+#import "ROI.h"
 
 #define STAT_UPDATE					0.6f
 #define IMAGE_COUNT					1
 #define IMAGE_DEPTH					32
 
 // Tools.
-
-// WARNING: If you add or modify this list, check ViewerController.m, DCMView.h and HotKey Pref Pane
-
-typedef NS_ENUM(short, ToolMode)
-{
-    tWL							=	0,
-    tTranslate,					//	1
-    tZoom,						//	2
-    tRotate,					//	3
-    tNext,						//	4
-    tMesure,					//	5
-    tROI,						//	6
-	t3DRotate,					//	7
-	tCross,						//	8
-	tOval,						//	9
-	tOPolygon,					//	10
-	tCPolygon,					//	11
-	tAngle ,					//	12
-	tText,						//	13
-	tArrow,						//	14
-	tPencil,					//	15
-	t3Dpoint,					//	16
-	t3DCut,						//	17
-	tCamera3D,					//	18
-	t2DPoint,					//	19
-	tPlain,						//	20
-	tBonesRemoval,				//	21
-	tWLBlended,					//  22
-	tRepulsor,					//  23
-	tLayerROI,					//	24
-	tROISelector,				//	25
-	tAxis,						//	26 
-	tDynAngle,					//	27
-	tCurvedROI,					//	28
-    tTAGT                       //  29
-};
-
 
 extern NSString *pasteBoardOsiriX;
 extern NSString *pasteBoardOsiriXPlugin;
@@ -105,8 +69,8 @@ typedef enum {DCMViewTextAlignLeft, DCMViewTextAlignCenter, DCMViewTextAlignRigh
 	NSString		*yearOld;
 	
 	ROI				*curROI;
-	int				volumicData;
-	BOOL			drawingROI, noScale, volumicSeries, mouseDraggedForROIUndo;
+	int				volumicData, areDCMPixParallel;
+	BOOL			drawingROI, noScale, mouseDraggedForROIUndo;
 	DCMView			*blendingView;
 	float			blendingFactor, blendingFactorStart;
 	BOOL			eraserFlag; // use by the PaletteController to switch between the Brush and the Eraser
@@ -191,6 +155,7 @@ typedef enum {DCMViewTextAlignLeft, DCMViewTextAlignCenter, DCMViewTextAlignRigh
 
 	
 	float			mouseXPos, mouseYPos;
+    BOOL            mouseOnImage, mouseOnView, blendingMouseOnImage;
 	float			pixelMouseValue;
 	long			pixelMouseValueR, pixelMouseValueG, pixelMouseValueB;
     
@@ -221,7 +186,10 @@ typedef enum {DCMViewTextAlignLeft, DCMViewTextAlignCenter, DCMViewTextAlignRigh
 	
 	BOOL			cursorSet;
 	NSTrackingArea	*cursorTracking;
-	
+	int             trackPadNumberOfFingers;
+    float           trackPadScaleAccumulator;
+    BOOL            trackPadMoved;
+    
 	NSPoint			display2DPoint;
     int             display2DPointIndex;
 	
@@ -259,7 +227,7 @@ typedef enum {DCMViewTextAlignLeft, DCMViewTextAlignCenter, DCMViewTextAlignRigh
 	
 	char			*resampledBaseAddr, *blendingResampledBaseAddr;
 	BOOL			zoomIsSoftwareInterpolated, firstTimeDisplay;
-	
+	float           resampledScale;
 	int				resampledBaseAddrSize, blendingResampledBaseAddrSize;
 		
 	// iChat
@@ -305,13 +273,18 @@ typedef enum {DCMViewTextAlignLeft, DCMViewTextAlignCenter, DCMViewTextAlignRigh
     int annotationType;
     
     NSArray *cleanedOutDcmPixArray;
+    
+    NSTimeInterval firstDisplay;
+    
+    NSString *mousePosUSRegion;
 }
 
 @property NSRect drawingFrameRect;
+@property(retain) NSArray *cleanedOutDcmPixArray;
 @property(readonly) NSMutableArray *rectArray, *curRoiList;
 @property BOOL COPYSETTINGSINSERIES, flippedData, showDescriptionInLarge;
 @property(nonatomic) BOOL whiteBackground;
-@property(readonly) NSMutableArray *dcmPixList,  *dcmRoiList;
+@property(retain) NSMutableArray *dcmPixList, *dcmRoiList;
 @property(readonly) NSArray *dcmFilesList;
 @property long syncSeriesIndex;
 @property(nonatomic)float syncRelativeDiff, studyColorR, studyColorG, studyColorB;
@@ -320,7 +293,7 @@ typedef enum {DCMViewTextAlignLeft, DCMViewTextAlignCenter, DCMViewTextAlignRigh
 @property(retain,setter=setBlending:) DCMView *blendingView;
 @property(readonly) float blendingFactor;
 @property(nonatomic) BOOL xFlipped, yFlipped;
-@property(retain) NSString *stringID;
+@property(retain) NSString *stringID, *mousePosUSRegion;
 @property(nonatomic) ToolMode currentTool;
 @property(setter=setRightTool:) ToolMode currentToolRight;
 @property(readonly) short curImage;
@@ -341,13 +314,14 @@ typedef enum {DCMViewTextAlignLeft, DCMViewTextAlignCenter, DCMViewTextAlignRigh
 @property(readonly) NSCursor *cursor;
 @property BOOL eraserFlag;
 @property BOOL drawing;
-@property BOOL volumicSeries;
+@property (readonly) BOOL volumicSeries;
 @property (nonatomic) NSTimeInterval timeIntervalForDrag;
 @property(readonly) BOOL isKeyView, mouseDragging;
 @property int annotationType;
+@property(readonly) int volumicData;
 
 + (void) setDontListenToSyncMessage: (BOOL) v;
-+ (BOOL) noPropagateSettingsInSeriesForModality: (NSString*) m;
++ (BOOL) noPropagateSettingsInSeriesForModality: (DicomImage*) imageObj;
 + (void) purgeStringTextureCache;
 + (void) setDefaults;
 + (void) setCLUTBARS:(int) c ANNOTATIONS:(int) a;
@@ -362,14 +336,17 @@ typedef enum {DCMViewTextAlignLeft, DCMViewTextAlignCenter, DCMViewTextAlignRigh
 + (double) angleBetweenVectorD: (double*) v1 andVectorD: (double*) v2;
 + (int) DistancePointLine: (NSPoint) Point :(NSPoint) startPoint :(NSPoint) endPoint :(float*) Distance;
 + (float) pbase_Plane: (float*) point :(float*) planeOrigin :(float*) planeVector :(float*) pointProjection;
++ (double) pbaseDouble_Plane: (double*) point :(double*) planeOrigin :(double*) planeVector :(double*) pointProjection;
 + (short)syncro;
 + (void)setSyncro:(short) s;
 - (BOOL) softwareInterpolation;
-- (void) applyImageTransformation;
+- (void) applyImageTransformation __deprecated;
+- (void) loadOpenGLIdentityForDrawingFrame: (NSRect) r;
 - (void) gClickCountSetReset;
 - (int) findPlaneAndPoint:(float*) pt :(float*) location;
 - (int) findPlaneForPoint:(float*) pt localPoint:(float*) location distanceWithPlane: (float*) distanceResult;
 - (int) findPlaneForPoint:(float*) pt preferParallelTo:(float*)parto localPoint:(float*) location distanceWithPlane: (float*) distanceResult;
+- (int) findPlaneForPoint:(float*) pt preferParallelTo:(float*)parto localPoint:(float*) location distanceWithPlane: (float*) distanceResult limitWithSliceThickness: (BOOL) limitWithSliceThickness;
 - (unsigned char*) getRawPixels:(long*) width :(long*) height :(long*) spp :(long*) bpp :(BOOL) screenCapture :(BOOL) force8bits;
 
 - (unsigned char*) getRawPixelsWidth:(long*) width height:(long*) height spp:(long*) spp bpp:(long*) bpp screenCapture:(BOOL) screenCapture force8bits:(BOOL) force8bits removeGraphical:(BOOL) removeGraphical squarePixels:(BOOL) squarePixels allTiles:(BOOL) allTiles allowSmartCropping:(BOOL) allowSmartCropping origin:(float*) imOrigin spacing:(float*) imSpacing;
@@ -388,7 +365,7 @@ typedef enum {DCMViewTextAlignLeft, DCMViewTextAlignCenter, DCMViewTextAlignRigh
 - (void)setSyncro:(short) s;
 
 // checks to see if tool is for ROIs.  maybe better name - (BOOL)isToolforROIs:(long)tool
-- (BOOL) roiTool:(ToolMode) tool;
+- (BOOL) roiTool:(long) tool;
 - (void) prepareToRelease;
 - (void) orientationCorrectedToView:(float*) correctedOrientation;
 #ifndef OSIRIX_LIGHT
@@ -413,6 +390,7 @@ typedef enum {DCMViewTextAlignLeft, DCMViewTextAlignCenter, DCMViewTextAlignRigh
 - (NSDictionary*) exportDCMCurrentImage: (DICOMExport*) exportDCM size:(int) size;
 - (NSDictionary*) exportDCMCurrentImage: (DICOMExport*) exportDCM size:(int) size  views: (NSArray*) views viewsRect: (NSArray*) viewsRect;
 - (NSDictionary*) exportDCMCurrentImage: (DICOMExport*) exportDCM size:(int) size  views: (NSArray*) views viewsRect: (NSArray*) viewsRect exportSpacingAndOrigin: (BOOL) exportSpacingAndOrigin;
+- (NSDictionary*) exportDCMCurrentImage: (DICOMExport*) exportDCM size:(int) size  views: (NSArray*) views viewsRect: (NSArray*) viewsRect exportSpacingAndOrigin: (BOOL) exportSpacingAndOrigin force8bits:(BOOL) force8bits;
 - (NSImage*) exportNSImageCurrentImageWithSize:(int) size;
 - (void) setIndex:(short) index;
 - (void) setIndexWithReset:(short) index :(BOOL)sizeToFit;
@@ -435,7 +413,7 @@ typedef enum {DCMViewTextAlignLeft, DCMViewTextAlignCenter, DCMViewTextAlignRigh
 - (void) sliderAction:(id) sender;
 - (void) roiSet;
 - (void) sync3DPosition;
-- (void) roiSet:(ROI*) aRoi;
+- (void) roiSet:(ROI*) aRoi __deprecated;
 - (void) colorTables:(unsigned char **) a :(unsigned char **) r :(unsigned char **)g :(unsigned char **) b;
 - (void) blendingColorTables:(unsigned char **) a :(unsigned char **) r :(unsigned char **)g :(unsigned char **) b;
 - (void )changeFont:(id)sender;
@@ -462,6 +440,7 @@ typedef enum {DCMViewTextAlignLeft, DCMViewTextAlignCenter, DCMViewTextAlignRigh
 - (void) updateCurrentImage: (NSNotification*) note;
 - (void) setImageParamatersFromView:(DCMView *)aView;
 - (void) setRows:(int)rows columns:(int)columns;
+- (DCMPix*) middleSliceInThickStack;
 - (void) updateTilingViews;
 - (void) becomeMainWindow;
 - (void) checkCursor;
@@ -471,7 +450,7 @@ typedef enum {DCMViewTextAlignLeft, DCMViewTextAlignCenter, DCMViewTextAlignRigh
 - (void) updatePresentationStateFromSeries;
 - (void) updatePresentationStateFromSeriesOnlyImageLevel: (BOOL) onlyImage;
 - (void) updatePresentationStateFromSeriesOnlyImageLevel: (BOOL) onlyImage scale: (BOOL) scale offset: (BOOL) offset;
-- (void) setCursorForView: (ToolMode) tool;
+- (void) setCursorForView: (long) tool;
 - (ToolMode) getTool: (NSEvent*) event;
 - (void)resizeWindowToScale:(float)resizeScale;
 - (float) getBlendedSUV;
@@ -489,11 +468,11 @@ typedef enum {DCMViewTextAlignLeft, DCMViewTextAlignCenter, DCMViewTextAlignRigh
 - (void) subDrawRect: (NSRect)aRect;     // Subclassable, default does nothing.
 - (void) drawRectAnyway:(NSRect)aRect;   // Subclassable, default does nothing.
 - (void) updateImage;
-- (BOOL) shouldPropagate;
 //- (NSPoint) convertFromView2iChat: (NSPoint) a;
 //- (NSPoint) convertFromNSView2iChat: (NSPoint) a;
 - (void) annotMenu:(id) sender;
 - (ROI*) clickInROI: (NSPoint) tempPt;
+- (ROI*) clickInROI: (NSPoint) tempPt testTextBox: (BOOL) t;
 - (void) switchShowDescriptionInLarge;
 - (void) deleteLens;
 - (void)getOrientationText:(char *) orientation : (float *) vector :(BOOL) inv;
@@ -511,7 +490,6 @@ typedef enum {DCMViewTextAlignLeft, DCMViewTextAlignCenter, DCMViewTextAlignRigh
 + (unsigned char*) PETblueTable;
 - (void) startDrag:(NSTimer*)theTimer;
 - (void)deleteMouseDownTimer;
-- (id)dicomImage;
 - (void) roiLoadFromFilesArray: (NSArray*) filenames;
 - (id)windowController;
 - (BOOL)is2DViewer;
@@ -524,7 +502,7 @@ typedef enum {DCMViewTextAlignLeft, DCMViewTextAlignCenter, DCMViewTextAlignRigh
 -(BOOL)actionForHotKey:(NSString *)hotKey;
 +(NSDictionary*) hotKeyDictionary;
 +(NSDictionary*) hotKeyModifiersDictionary;
-
+- (void) delete3DROIsAliases;
 //iChat
 // New Draw method to allow for IChat Theater
 - (void) drawRect:(NSRect)aRect withContext:(NSOpenGLContext *)ctx;
@@ -533,7 +511,6 @@ typedef enum {DCMViewTextAlignLeft, DCMViewTextAlignCenter, DCMViewTextAlignRigh
 // Methods for mouse drag response  Can be modified for subclassing
 // This allow the various tools to  have different responses indifferent subclasses.
 // Making it easie to modify mouseDragged:
-- (NSPoint)currentPointInView:(NSEvent *)event;
 - (BOOL)checkROIsForHitAtPoint:(NSPoint)point forEvent:(NSEvent *)event;
 - (BOOL)mouseDraggedForROIs:(NSEvent *)event;
 - (void)mouseDraggedCrosshair:(NSEvent *)event;
@@ -547,7 +524,6 @@ typedef enum {DCMViewTextAlignLeft, DCMViewTextAlignCenter, DCMViewTextAlignRigh
 - (void)mouseDraggedRepulsor:(NSEvent *)event;
 - (void)mouseDraggedROISelector:(NSEvent *)event;
 
-- (void)deleteROIGroupID:(NSTimeInterval)groupID;
 - (void) computeColor;
 - (void)setIsLUT12Bit:(BOOL)boo;
 - (BOOL)isLUT12Bit;

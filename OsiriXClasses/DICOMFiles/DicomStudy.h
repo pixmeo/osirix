@@ -99,6 +99,7 @@
 - (void) reapplyAnnotationsFromDICOMSR;
 - (NSComparisonResult) compareName:(DicomStudy*)study;
 - (NSArray*) roiImages;
+- (NSNumber*) dicomTime;
 - (NSArray*) generateDICOMSCImagesForKeyImages: (BOOL) keyImages andROIImages: (BOOL) ROIImages;
 @end
 

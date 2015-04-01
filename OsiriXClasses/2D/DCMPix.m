@@ -92,13 +92,6 @@ static NSConditionLock *processorsLock = nil;
 static NSConditionLock *purgeCacheLock = nil;
 static float deg2rad = M_PI / 180.0; 
 
-struct NSPointInt
-{
-	long x;
-	long y;
-};
-typedef struct NSPointInt NSPointInt;
-
 NSString* filenameWithDate( NSString *inputfile);
 
 extern NSRecursiveLock *PapyrusLock;

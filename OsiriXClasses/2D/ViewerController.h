@@ -16,8 +16,7 @@
 
 #import <Cocoa/Cocoa.h>
 #import <AppKit/AppKit.h>
-
-#import "DCMView.h" // added for ToolMode enum
+#import "ROI.h"
 
 @class DCMView;
 @class OpacityTransferView;
@@ -69,6 +68,7 @@ enum
 	NSRecursiveLock	*roiLock;
 	NSConditionLock *flipDataThread, *convThread;
 	NSThread *loadingThread;
+    BOOL awakeFromNib, firstBuildMatrix;
 	
     ToolbarPanelController *toolbarPanel;
     
@@ -117,7 +117,7 @@ enum
     IBOutlet NSPopUpButton  *convPopup;
     IBOutlet NSPopUpButton  *clutPopup;
 	IBOutlet NSPopUpButton  *OpacityPopup;
-    BOOL OpacityPopupSet, clutPopupSet, convPopupSet, wlwwPopupSet;
+    BOOL OpacityPopupSet, clutPopupSet, convPopupSet, wlwwPopupSet, clutDICOMFileMenuAdded;
     IBOutlet NSPopUpButton  *seriesPopupMenu;
     IBOutlet NSPopUpButton  *windowsTilingMenu;
     NSMenuItem               *seriesPopupContextualMenu;
@@ -339,18 +339,21 @@ enum
 	
 	IBOutlet NSWindow		*injectionTimeWindow;
 	
-	int						isDataVolumicIn4DLevel;
+	int						isDataVolumicIn4DLevel, matrixVisibleStack;
 	int						previousFullscreenColumns, previousFullscreenRows, previousFullscreenCurImage, previousFullscreenViewIndex, previousPropagate, previousScaledFit;
     NSRect                  previousFrameRect;
     NSString                *windowsStateName;
     
-    BOOL                    computeInterval;
+    BOOL                    computeInterval, protectRecursiveComputeInterval;
     
     NSRect                  windowFrameToRestore;
     BOOL                    scaleFitToRestore;
+    
+    long                    numberOfImagesForSeriesAtInit;
 }
 @property(retain) NSCalendarDate *injectionDateTime;
-@property(readonly) short currentOrientationTool;
+@property(readonly) NSSlider *slider;
+@property(readonly) short currentOrientationTool, originalOrientation;
 @property(readonly) NSTimer	*timer;
 @property(readonly) NSButton *keyImageCheck;
 @property(readonly) NSSlider *speedSlider;
@@ -366,6 +369,8 @@ enum
 @property(readonly) NSButton *blendingResample;
 @property(readonly) BOOL titledGantry;
 @property(readonly) ToolbarPanelController *toolbarPanel;
+@property(readonly) NSMatrix *previewMatrix;
+@property(readonly) NSScrollView *previewMatrixScrollView;
 
 /** Return the 'dragged' window, the destination window is contained in the 'viewerController' object of the 'PluginFilter' object */
 @property(nonatomic, retain) ViewerController *blendedWindow;
@@ -381,7 +386,9 @@ enum
 + (ViewerController*) frontMostDisplayed2DViewerForScreen: (NSScreen*) screen;
 + (NSArray*) displayed2DViewerForScreen: (NSScreen*) screen;
 + (void) closeAllWindows;
++ (NSArray*) poolOf2DViewers;
 + (NSArray*) studyColors;
++ (void) clearFrontMost2DViewerCache;
 
 /**  Create a new 2D Viewer
 * @param pixList Array of DCMPix objects
@@ -461,7 +468,7 @@ enum
 - (MyPoint*) newPoint: (float) x :(float) y;
 
 /** Create a new ROI object */
-- (ROI*) newROI: (ToolMode) type;
+- (ROI*) newROI: (long) type;
 
 /** Check if the ROI belongs to this viewer */
 - (BOOL) containsROI:(ROI*)roi;
@@ -538,6 +545,8 @@ enum
 /** Refreshed window width and window level */
 - (void) refresh;
 
+- (void) recomputeROIs;
+
 /** Action to sset up non DICOM printing */
 - (IBAction) setPagesToPrint:(id) sender;
 
@@ -545,7 +554,7 @@ enum
 - (IBAction) endPrint:(id) sender;
 
 + (ToolMode) getToolEquivalentToHotKey:(int) h;
-+ (int) getHotKeyEquivalentToTool:(ToolMode) h;
++ (int) getHotKeyEquivalentToTool:(int) h;
 //- (IBAction) startMSRG:(id) sender;
 //- (IBAction) startMSRGWithAutomaticBounding:(id) sender;
 //arg: this function will automatically scan the buffer to create a textured ROI (tPlain) for all slices
@@ -604,7 +613,7 @@ enum
 - (void) roiLoadFromSeries: (NSString*) filename;
 - (void) offsetMatrixSetting: (int) twentyFiveCodes;
 - (IBAction) mergeBrushROI: (id) sender;
-- (IBAction) mergeBrushROI: (id) sender ROIs: (NSArray*) s ROIList: (NSMutableArray*) roiList;
+- (IBAction) mergeBrushROI: (id) sender ROIs: (NSArray*) s;
 - (IBAction) subSumSlider:(id) sender;
 - (IBAction) subSharpen:(id) sender;
 - (void) displayWarningIfGantryTitled;
@@ -735,6 +744,7 @@ enum
 #ifndef OSIRIX_LIGHT
 /** ReSort the images displayed according to IMAGE Table field */
 - (BOOL) sortSeriesByValue: (NSString*) key ascending: (BOOL) ascending;
+- (BOOL) exchangeIndex: (int) index withIndex: (int) otherIndex;
 
 /** ReSort the images displayed according to this group/element */
 - (BOOL) sortSeriesByDICOMGroup: (int) gr element: (int) el;
@@ -827,7 +837,7 @@ enum
 
 - (void) revertSeries:(id) sender;
 - (void) executeRevert;
-- (NSImage*) imageForROI: (ToolMode) i;
+- (NSImage*) imageForROI: (int) i;
 - (void) ActivateBlending:(ViewerController*) bC;
 - (void) setFusionMode:(long) m;
 - (short) curMovieIndex;
@@ -856,6 +866,7 @@ enum
 - (void)setToolbarReportIconForItem:(NSToolbarItem *)item;
 - (void)updateReportToolbarIcon:(NSNotification *)note;
 - (IBAction) setOrientationTool:(id) sender;
+- (BOOL) setOrientation: (int) newOrientationTool;
 - (void) setWindowTitle:(id) sender;
 - (IBAction) printSlider:(id) sender;
 - (void) setConv:(float*) matrix :(short) size :(float) norm;
@@ -877,6 +888,7 @@ enum
 - (void) redrawToolbar;
 - (NSScrollView*) previewMatrixScrollView;
 - (NSView*) previewRootView;
+- (NSMatrix*) buttonToolMatrix;
 
 #pragma mark-
 #pragma mark Brush ROI Filters
@@ -917,7 +929,7 @@ enum
 /** Convert Polygon ROI to a Brush ROI.
 * @param selectedROI The ROI to convert
 */
-- (ROI*) convertPolygonROItoBrush:(ROI*) selectedROI;
+- (ROI*) convertPolygonROItoBrush:(ROI*) selectedROI __deprecated;
 
 /** Convert Brush ROI to a Polygon ROI. Returns converted ROI
 * @param selectedROI The ROI to convert
@@ -1058,9 +1070,9 @@ enum
 
 /** Tile the images within the active ViewerController
 * Tiling based on tag of menu item
-* 16 possible arrangements
-* rows = (tag / 4) + 1;
-* columns =  (tag %  4) + 1; 
+* 25 possible arrangements
+* rows = (tag / 5) + 1;
+* columns =  (tag % 5) + 1;
 * - (void)setImageRows:(int)rows columns:(int)columns then called
 */
 - (IBAction)setImageTiling: (id)sender;

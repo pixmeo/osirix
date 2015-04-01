@@ -722,11 +722,6 @@ void ConnectPipelines(ITK_Exporter exporter, VTK_Importer* importer)
                     {
                         int currentImageIndex = [[srcViewer imageView] curImage];
                         
-                        for( NSMutableArray *rois in [srcViewer roiList])
-                        {
-                            [srcViewer mergeBrushROI: self ROIs: rois ROIList: rois];
-                        }
-                        
                         [[srcViewer imageView] setIndex: currentImageIndex];
                         [[srcViewer imageView] sendSyncMessage:0];
                         [srcViewer adjustSlider];

@@ -99,19 +99,6 @@ static NSString  *pasteBoardTypeCover = @"KeyImages";
         [nc postNotificationName:OsirixDragMatrixImageMovedNotification object:self userInfo:dict];
     }
 	
-	if ([types indexOfObject:pasteBoardOsiriX] != NSNotFound)
-	{
-		NSArray *array = nil;
-		 id image = [(DCMView *)[sender draggingSource] dicomImage];
-		 if (image)
-			array = [NSArray arrayWithObject:image];
-		//NSLog(@"Selection: 
-		if (array)
-		{
-			dict = [NSDictionary dictionaryWithObject:array forKey:@"images"];
-			[nc postNotificationName:OsirixDragMatrixImageMovedNotification object:self userInfo:dict];
-		}
-	}
     
     [self clearDragDestinationMembers];
     [self setNeedsDisplay:TRUE];

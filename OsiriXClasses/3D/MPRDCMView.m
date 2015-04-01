@@ -1719,35 +1719,47 @@ extern unsigned int minimumStep;
 
 - (void) mouseDraggedImageScroll:(NSEvent *) event
 {
-	[self checkCursor];
-	
-	NSPoint current = [self currentPointInView: event];
-	
-	if( scrollMode == 0)
-	{
-		if( fabs( start.x - current.x) < fabs( start.y - current.y))
-		{
-			if( fabs( start.y - current.y) > 3) scrollMode = 1;
-		}
-		else if( fabs( start.x - current.x) >= fabs( start.y - current.y))
-		{
-			if( fabs( start.x - current.x) > 3) scrollMode = 2;
-		}
-	}
-	
-	float delta;
-	
-	if( scrollMode == 1)
-		delta = ((previous.y - current.y) * 512. )/ ([self convertSizeToBacking: self.frame.size].width/2);
-	else
-		delta = ((current.x - previous.x) * 512. )/ ([self convertSizeToBacking: self.frame.size].width/2);
-	
-	[self restoreCamera];
-	windowController.lowLOD = YES;
-	[vrView scrollInStack: delta];
-	[self updateViewMPR];
-	[self updateMousePosition: event];
-	windowController.lowLOD = NO;
+    short now, prev;
+    BOOL movie4Dmove = NO;
+    NSPoint current = [self convertPoint: event.locationInWindow fromView: nil];
+    if( scrollMode == 0)
+    {
+        if( fabs( start.x - current.x) < fabs( start.y - current.y))
+        {
+            prev = start.y/2;
+            now = current.y/2;
+            if( fabs( start.y - current.y) > 3) scrollMode = 1;
+        }
+        else if( fabs( start.x - current.x) >= fabs( start.y - current.y))
+        {
+            prev = start.x/2;
+            now = current.x/2;
+            if( fabs( start.x - current.x) > 3) scrollMode = 2;
+        }
+        
+        //	NSLog(@"scrollMode : %d", scrollMode);
+    }
+    
+    
+    if( movie4Dmove == NO)
+    {
+        long from, to;
+        if( scrollMode == 2)
+        {
+            from = current.x;
+            to = start.x;
+        }
+        else if( scrollMode == 1)
+        {
+            from = start.y;
+            to = current.y;
+        }
+        else
+        {
+            from = 0;
+            to = 0;
+        }
+    }
 }
 
 -(void) magnifyWithEvent:(NSEvent *)anEvent
