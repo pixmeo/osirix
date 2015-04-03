@@ -283,6 +283,25 @@
     return [self volumeDataResampledWithVolumeTransform:shiftedTransform pixelsWide:width pixelsHigh:height pixelsDeep:depth interpolationMode:interpolationsMode];
 }
 
+- (BOOL)getCubicInterpolatedFloat:(float *)floatPtr atDicomVector:(N3Vector)vector
+{
+    CPRVolumeDataInlineBuffer inlineBuffer;
+
+    if (_isValid == NO) {
+        return NO;
+    }
+
+    if ([self aquireInlineBuffer:&inlineBuffer]) {
+        *floatPtr = CPRVolumeDataCubicInterpolatedFloatAtDicomVector(&inlineBuffer, vector);
+        [self releaseInlineBuffer:&inlineBuffer];
+        return YES;
+    } else {
+        [self releaseInlineBuffer:&inlineBuffer];
+        *floatPtr = 0.0;
+        return NO;
+    }
+}
+
 
 - (instancetype)volumeDataResampledWithVolumeTransform:(N3AffineTransform)transform pixelsWide:(NSUInteger)pixelsWide pixelsHigh:(NSUInteger)pixelsHigh pixelsDeep:(NSUInteger)pixelsDeep
                                         interpolationMode:(CPRInterpolationMode)interpolationsMode;
