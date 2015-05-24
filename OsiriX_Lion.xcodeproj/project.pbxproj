@@ -26082,8 +26082,6 @@
 					Binaries,
 					"\"$(SRCROOT)/Binaries\"",
 					"\"$(SRCROOT)/Binaries/KDU SDK\"",
-					"$(PROJECT_DIR)/Binaries/KDU",
-					SDK,
 				);
 				OTHER_LDFLAGS = (
 					"-seg1addr",
@@ -26173,8 +26171,6 @@
 					"\"$(PROJECT_DIR)/Binaries/CharLS\"",
 					"\"$(PROJECT_DIR)/ITK180/lib\"",
 					"$(PROJECT_DIR)/Binaries/Ming",
-					"$(PROJECT_DIR)/Binaries/KDU",
-					SDK,
 					ITK180,
 					ITK180/Modules/Core/Common/include,
 					AYDicomPrint,
