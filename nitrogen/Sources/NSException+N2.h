@@ -12,8 +12,11 @@
      PURPOSE.
 =========================================================================*/
 
+#if TARGET_OS_IPHONE
+#import <Foundation/Foundation.h>
+#else
 #import <Cocoa/Cocoa.h>
-
+#endif
 
 extern NSString* const N2ErrorDomain;
 

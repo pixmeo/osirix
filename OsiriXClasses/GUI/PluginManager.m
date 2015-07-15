@@ -722,27 +722,9 @@ BOOL gPluginsAlertAlreadyDisplayed = NO;
 		
 		NSLog( @"|||||||||||||||||| Plugins loading START ||||||||||||||||||");
         #ifndef OSIRIX_LIGHT
-		
-        NSString *pluginCrash = [[[NSFileManager defaultManager] userApplicationSupportFolderForApp] stringByAppendingPathComponent:@"Plugin_Loading"];
-        if ([[NSFileManager defaultManager] fileExistsAtPath: pluginCrash] && ![[NSUserDefaults standardUserDefaults] boolForKey:@"DoNotDeleteCrashingPlugins"])
-        {
-            NSString *pluginCrashPath = [NSString stringWithContentsOfFile: pluginCrash encoding: NSUTF8StringEncoding error: nil];
-            
-            int result = NSRunInformationalAlertPanel(NSLocalizedString(@"OsiriX crashed", nil), NSLocalizedString(@"Previous crash is maybe related to a plugin.\r\rShould I remove this plugin (%@)?", nil), NSLocalizedString(@"Delete Plugin",nil), NSLocalizedString(@"Continue",nil), nil, [pluginCrashPath lastPathComponent]);
-            
-            if( result == NSAlertDefaultReturn) // Delete Plugin
-            {
-                NSError *error = nil;
-                [[NSFileManager defaultManager] removeItemAtPath: pluginCrashPath error: &error];
-                
-                if( error)
-                    NSLog( @"**** Cannot Delete File : Crashing Plugin Delete Error: %@", error);
-            }
-            
-            [[NSFileManager defaultManager] removeItemAtPath: pluginCrash error: nil];
-        }
         
         NSMutableArray* pathsOfPluginsToLoad = [NSMutableArray array];
+        NSMutableArray* pathsOfPluginsFromLoadArguments = [NSMutableArray array];
         NSMutableArray* dontLoadOtherWithTheseNames = [NSMutableArray array];
         
         for (id path in paths)
@@ -775,6 +757,7 @@ BOOL gPluginsAlertAlreadyDisplayed = NO;
                             NSString* pluginpath = [args objectAtIndex:++i];
                             [cl addObject:pluginpath];
                             [dontLoadOtherWithTheseNames addObject:pluginpath.lastPathComponent];
+                            [pathsOfPluginsFromLoadArguments addObject:pluginpath];
                         }
                     e = [cl objectEnumerator];
                 }
@@ -786,6 +769,31 @@ BOOL gPluginsAlertAlreadyDisplayed = NO;
             } @catch (NSException* e) {
                 N2LogExceptionWithStackTrace(e);
             }
+        
+        NSString *pluginCrash = [[[NSFileManager defaultManager] userApplicationSupportFolderForApp] stringByAppendingPathComponent:@"Plugin_Loading"];
+        if ([[NSFileManager defaultManager] fileExistsAtPath: pluginCrash] && ![[NSUserDefaults standardUserDefaults] boolForKey:@"DoNotDeleteCrashingPlugins"])
+        {
+            NSString *pluginCrashPath = [NSString stringWithContentsOfFile: pluginCrash encoding: NSUTF8StringEncoding error: nil];
+            
+            if (![pathsOfPluginsFromLoadArguments containsObject:pluginCrashPath])
+            {
+                int result = NSRunInformationalAlertPanel(NSLocalizedString(@"OsiriX crashed", nil), NSLocalizedString(@"Previous crash is maybe related to a plugin.\r\rShould I remove this plugin (%@)?", nil), NSLocalizedString(@"Delete Plugin",nil), NSLocalizedString(@"Continue",nil), nil, [pluginCrashPath lastPathComponent]);
+                
+                if (result == NSAlertDefaultReturn) // Delete Plugin
+                {
+                    NSError *error = nil;
+                    [[NSFileManager defaultManager] removeItemAtPath: pluginCrashPath error: &error];
+                    
+                    if( error)
+                        NSLog( @"**** Cannot Delete File : Crashing Plugin Delete Error: %@", error);
+                    
+                    [pathsOfPluginsToLoad removeObject:pluginCrashPath];
+                }
+            }
+            
+            [[NSFileManager defaultManager] removeItemAtPath: pluginCrash error: nil];
+        }
+        
         
 //        NSLog(@"paths: %@", pathsOfPluginsToLoad);
 
