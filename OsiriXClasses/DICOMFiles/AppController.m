@@ -687,12 +687,12 @@ static NSDate *lastWarningDate = nil;
 	return YES;
 }
 
-+(BOOL) hasMacOSXSyrah
++(BOOL) isUnsupportedOS
 {
     SInt32 OSXversionMajor, OSXversionMinor;
     if(Gestalt(gestaltSystemVersionMajor, &OSXversionMajor) == noErr && Gestalt(gestaltSystemVersionMinor, &OSXversionMinor) == noErr)
     {
-        if(OSXversionMajor == 10 && OSXversionMinor >= 10)
+        if(OSXversionMajor == 10 && OSXversionMinor > 11)
         {
             return YES;
         }
@@ -4099,7 +4099,7 @@ static BOOL initialized = NO;
         }
     }
     
-    if( [AppController hasMacOSXSyrah])
+    if( [AppController isUnsupportedOS])
     {
         NSAlert* alert = [[NSAlert new] autorelease];
         [alert setMessageText: NSLocalizedString( @"Mac OS Version", nil)];
