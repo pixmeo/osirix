@@ -23385,7 +23385,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = NO;
 				LastTestingUpgradeCheck = 0510;
-				LastUpgradeCheck = 0500;
+				LastUpgradeCheck = 0720;
 				ORGANIZATIONNAME = "OsiriX Team";
 				TargetAttributes = {
 					AB28B42E05B7921E00A9906C = {
