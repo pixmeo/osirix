@@ -218,6 +218,9 @@ static NSString* getMacAddress( void)
     
     (void) IOObjectRelease(intfIterator);	// Release the iterator.
     
+    if( result.length == 0)
+        result = @"01:02:03:04:05:06";
+    
     return result;
 }
 
