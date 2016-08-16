@@ -1015,7 +1015,7 @@ return YES;
 	[[self flyThruController].stepsArrayController flyThruTag:0];
 }
 
-- (void) add2DPoint: (float) x : (float) y : (float) z
+- (BOOL) add2DPoint: (float) x : (float) y : (float) z
 {
 	if (viewer2D && [[viewer2D pixList] count] > 1)
 	{
@@ -1050,8 +1050,12 @@ return YES;
 			[z2DPointsArray addObject:[NSNumber numberWithFloat:z]];
 			// notify the change
 			[[NSNotificationCenter defaultCenter] postNotificationName: OsirixROIChangeNotification object: new2DPointROI userInfo: nil];
+            
+            return YES;
 		}
 	}
+    
+    return NO;
 }
 
 - (void) remove2DPoint: (float) x : (float) y : (float) z

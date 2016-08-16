@@ -2872,8 +2872,11 @@ typedef struct _xyzArray
 	picker->Pick(x, y, 0.0, aRenderer);
 	double wXYZ[3];
 	picker->GetPickPosition(wXYZ);
-	[self add3DPoint: wXYZ[0] : wXYZ[1] : wXYZ[2]];
-	[controller add2DPoint: wXYZ[0] : wXYZ[1] : wXYZ[2]];
+	
+	if( [controller add2DPoint: wXYZ[0] : wXYZ[1] : wXYZ[2]])
+    {
+        [self add3DPoint: wXYZ[0] : wXYZ[1] : wXYZ[2]];
+    }
 	
 	picker->Delete();
 }
