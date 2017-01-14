@@ -4099,23 +4099,23 @@ static BOOL initialized = NO;
         }
     }
     
-    if( [AppController isUnsupportedOS])
-    {
-        NSAlert* alert = [[NSAlert new] autorelease];
-        [alert setMessageText: NSLocalizedString( @"Mac OS Version", nil)];
-        
-        [alert setInformativeText: NSLocalizedString( @"This version of OsiriX has not been validated or certified for this version of MacOS. Bugs, errors and instabilities can occur. Upgrade to latest version of OsiriX to solve this problem.", nil)];
-        
-        [alert addButtonWithTitle: NSLocalizedString( @"OK", nil)];
-        [alert addButtonWithTitle: NSLocalizedString( @"Upgrade", nil)];
-        
-        NSInteger button = [alert runModal];
-        
-        if( button == NSAlertSecondButtonReturn)
-        {
-            [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:@"http://www.osirix-viewer.com"]];
-        }
-    }
+//    if( [AppController isUnsupportedOS])
+//    {
+//        NSAlert* alert = [[NSAlert new] autorelease];
+//        [alert setMessageText: NSLocalizedString( @"Mac OS Version", nil)];
+//        
+//        [alert setInformativeText: NSLocalizedString( @"This version of OsiriX has not been validated or certified for this version of MacOS. Bugs, errors and instabilities can occur. Upgrade to latest version of OsiriX to solve this problem.", nil)];
+//        
+//        [alert addButtonWithTitle: NSLocalizedString( @"OK", nil)];
+//        [alert addButtonWithTitle: NSLocalizedString( @"Upgrade", nil)];
+//        
+//        NSInteger button = [alert runModal];
+//        
+//        if( button == NSAlertSecondButtonReturn)
+//        {
+//            [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:@"http://www.osirix-viewer.com"]];
+//        }
+//    }
     
 	if( [AppController hasMacOSXMountainLion] == NO)
 	{

@@ -1842,10 +1842,10 @@ static NSConditionLock *threadLock = nil;
 	{
 		NSString	*location = [oPanel filename];
 		
-		if( [[location lastPathComponent] isEqualToString:@"OsiriX Data"])
+		if( [[location lastPathComponent] isEqualToString:@"OsiriX OS Data"])
 			location = [location stringByDeletingLastPathComponent];
 		
-		if( [[location lastPathComponent] isEqualToString:@"DATABASE.noindex"] && [[[location stringByDeletingLastPathComponent] lastPathComponent] isEqualToString:@"OsiriX Data"])
+		if( [[location lastPathComponent] isEqualToString:@"DATABASE.noindex"] && [[[location stringByDeletingLastPathComponent] lastPathComponent] isEqualToString:@"OsiriX OS Data"])
 			location = [[location stringByDeletingLastPathComponent] stringByDeletingLastPathComponent];
 		
 		[self openDatabasePath: location];
@@ -1922,7 +1922,7 @@ static NSConditionLock *threadLock = nil;
 		if( isDirectory)
 		{
 			// Default SQL file
-			NSString	*index = [[path stringByAppendingPathComponent:@"OsiriX Data"] stringByAppendingPathComponent:@"Database.sql"];
+			NSString	*index = [[path stringByAppendingPathComponent:@"OsiriX OS Data"] stringByAppendingPathComponent:@"Database.sql"];
 			
 			if( [[NSFileManager defaultManager] fileExistsAtPath: index])
 			{

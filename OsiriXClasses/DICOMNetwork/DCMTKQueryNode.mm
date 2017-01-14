@@ -1918,7 +1918,7 @@ static NSString *releaseNetworkVariablesSync = @"releaseNetworkVariablesSync";
             {
                 T_ASC_Association *assoc = (T_ASC_Association*) [[dict objectForKey: @"assoc"] pointerValue];
                 T_ASC_Network *net = (T_ASC_Network*) [[dict objectForKey: @"net"] pointerValue];
-                DcmTLSTransportLayer *tLayer = (DcmTLSTransportLayer*) [[dict objectForKey: @"tLayer"] pointerValue];
+//                DcmTLSTransportLayer *tLayer = (DcmTLSTransportLayer*) [[dict objectForKey: @"tLayer"] pointerValue];
                 OFCondition cond;
                 
                 // CLEANUP
@@ -2032,8 +2032,8 @@ static NSString *releaseNetworkVariablesSync = @"releaseNetworkVariablesSync";
 			[wait setCancel: YES];
 			[wait start];
 		}
-		
-		DcmTLSTransportLayer *tLayer = NULL;
+
+//		DcmTLSTransportLayer *tLayer = NULL;
 		NSString *uniqueStringID = [NSString stringWithFormat:@"%d.%d.%d", getpid(), inc++, (int) random()];
 		
 	//	if (_secureConnection)
@@ -2535,7 +2535,7 @@ static NSString *releaseNetworkVariablesSync = @"releaseNetworkVariablesSync";
         
         @synchronized( releaseNetworkVariablesDictionaries)
         {
-            [releaseNetworkVariablesDictionaries addObject: [NSDictionary dictionaryWithObjectsAndKeys: [NSDate date], @"date", [NSValue valueWithPointer: assoc], @"assoc", [NSValue valueWithPointer: net], @"net", [NSValue valueWithPointer: tLayer], @"tLayer", nil]];
+            [releaseNetworkVariablesDictionaries addObject: [NSDictionary dictionaryWithObjectsAndKeys: [NSDate date], @"date", [NSValue valueWithPointer: assoc], @"assoc", [NSValue valueWithPointer: net], @"net", nil]];
         }
         
 //		// CLEANUP

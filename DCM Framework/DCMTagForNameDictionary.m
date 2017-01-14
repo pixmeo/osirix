@@ -35,7 +35,7 @@ static DCMTagForNameDictionary *sharedTagForNameDictionary;
 			
 		}
 		
-		sharedTagForNameDictionary = [[NSDictionary dictionaryWithContentsOfFile:path] retain];
+		sharedTagForNameDictionary = [[DCMTagForNameDictionary dictionaryWithContentsOfFile:path] retain];
 	}
 	return sharedTagForNameDictionary;
 }
