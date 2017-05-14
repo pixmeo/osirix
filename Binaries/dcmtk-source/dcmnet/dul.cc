@@ -2048,7 +2048,7 @@ initializeNetworkTCP(PRIVATE_NETWORKKEY ** key, void *parameter)
         server.sin_family = AF_INET;
         server.sin_addr.s_addr = INADDR_ANY;
         server.sin_port = (unsigned short) htons((*key)->networkSpecific.TCP.port);
-        if (bind((*key)->networkSpecific.TCP.listenSocket,
+        if (::bind((*key)->networkSpecific.TCP.listenSocket,
                  (struct sockaddr *) & server, sizeof(server)))
         {
           char buf3[256];
