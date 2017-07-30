@@ -239,7 +239,6 @@
 		841721C610D8D745001A833F /* HTTPResponse.h in Headers */ = {isa = PBXBuildFile; fileRef = 841721B210D8D745001A833F /* HTTPResponse.h */; };
 		841721C710D8D745001A833F /* HTTPResponse.m in Sources */ = {isa = PBXBuildFile; fileRef = 841721B310D8D745001A833F /* HTTPResponse.m */; };
 		841721C910D8D745001A833F /* HTTPServer.m in Sources */ = {isa = PBXBuildFile; fileRef = 841721B510D8D745001A833F /* HTTPServer.m */; };
-		841721CB10D8D745001A833F /* SSCrypto.m in Sources */ = {isa = PBXBuildFile; fileRef = 841721B710D8D745001A833F /* SSCrypto.m */; };
 		841721FC10D8D8A0001A833F /* HTTPServer.h in Headers */ = {isa = PBXBuildFile; fileRef = 841721B410D8D745001A833F /* HTTPServer.h */; };
 		841722B010D90595001A833F /* DDKeychain.h in Headers */ = {isa = PBXBuildFile; fileRef = 841722AE10D90595001A833F /* DDKeychain.h */; };
 		841722B110D90595001A833F /* DDKeychain.m in Sources */ = {isa = PBXBuildFile; fileRef = 841722AF10D90595001A833F /* DDKeychain.m */; };
@@ -1637,7 +1636,6 @@
 		ABD559FE0AEE146900108895 /* SagSmall.tif in Resources */ = {isa = PBXBuildFile; fileRef = ABD559F50AEE146900108895 /* SagSmall.tif */; };
 		ABD559FF0AEE146900108895 /* CorSmall.tif in Resources */ = {isa = PBXBuildFile; fileRef = ABD559F60AEE146900108895 /* CorSmall.tif */; };
 		ABD55A000AEE146900108895 /* AxialSmall.tif in Resources */ = {isa = PBXBuildFile; fileRef = ABD559F70AEE146900108895 /* AxialSmall.tif */; };
-		ABDB79C91117109600CC1EC5 /* SSCrypto.h in Headers */ = {isa = PBXBuildFile; fileRef = 841721B610D8D745001A833F /* SSCrypto.h */; };
 		ABDE6E1906398E3400F0C5DD /* port.h in Headers */ = {isa = PBXBuildFile; fileRef = ABDE6E0B06398E3400F0C5DD /* port.h */; };
 		ABDE6E1A06398E3400F0C5DD /* t4.h in Headers */ = {isa = PBXBuildFile; fileRef = ABDE6E0C06398E3400F0C5DD /* t4.h */; };
 		ABDE6E1B06398E3400F0C5DD /* tif_dir.h in Headers */ = {isa = PBXBuildFile; fileRef = ABDE6E0D06398E3400F0C5DD /* tif_dir.h */; };
@@ -1998,8 +1996,6 @@
 		BFAEB40B06BF3BEE00C7EF1E /* DCMPixelDataAttributeJPEG12.m in Sources */ = {isa = PBXBuildFile; fileRef = BFAEB40706BF3BEE00C7EF1E /* DCMPixelDataAttributeJPEG12.m */; };
 		BFAEB41A06BF3BFA00C7EF1E /* DCMPixelDataAttributeJPEG16.h in Headers */ = {isa = PBXBuildFile; fileRef = BFAEB41606BF3BFA00C7EF1E /* DCMPixelDataAttributeJPEG16.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		BFAEB41B06BF3BFA00C7EF1E /* DCMPixelDataAttributeJPEG16.m in Sources */ = {isa = PBXBuildFile; fileRef = BFAEB41706BF3BFA00C7EF1E /* DCMPixelDataAttributeJPEG16.m */; };
-		BFBF3AA109B681F500545F5E /* libcrypto.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = BFBF3A9D09B681F500545F5E /* libcrypto.dylib */; };
-		BFBF3AA209B681F500545F5E /* libssl.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = BFBF3A9E09B681F500545F5E /* libssl.dylib */; };
 		BFBF3AA309B681F500545F5E /* libxml2.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = BFBF3A9F09B681F500545F5E /* libxml2.dylib */; };
 		BFBF3AA409B681F500545F5E /* libz.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = BFBF3AA009B681F500545F5E /* libz.dylib */; };
 		BFBF3E6E09B6828D00545F5E /* cfunix.h in Headers */ = {isa = PBXBuildFile; fileRef = BFBF3AB809B6827D00545F5E /* cfunix.h */; };
@@ -6398,7 +6394,6 @@
 		CEEE567D1775EB11008C6DFA /* libPapyrusToolkit.a in Frameworks */ = {isa = PBXBuildFile; fileRef = CEEE567C1775EB11008C6DFA /* libPapyrusToolkit.a */; };
 		CEEE567F1775EB11008C6DFA /* libPapyrusToolkit.a in Frameworks */ = {isa = PBXBuildFile; fileRef = CEEE567C1775EB11008C6DFA /* libPapyrusToolkit.a */; };
 		CEF09317182D23B20020C70A /* ThumbnailsList.xib in Resources */ = {isa = PBXBuildFile; fileRef = CEF09315182D23B20020C70A /* ThumbnailsList.xib */; };
-		CEF0E4BC06AEC91F001FF9E5 /* Message.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CEF0E4BB06AEC91F001FF9E5 /* Message.framework */; };
 		CEF0E6DC06AEF5CB001FF9E5 /* Carbon.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CEF0E6DA06AEF5CB001FF9E5 /* Carbon.framework */; };
 		CEF30FD10945DEA300824A2B /* windows.tif in Resources */ = {isa = PBXBuildFile; fileRef = CEF30FD00945DEA300824A2B /* windows.tif */; };
 		CEFB8A9910C19902000DCCB0 /* ReportTemplate.odt in Resources */ = {isa = PBXBuildFile; fileRef = CEFB8A9810C19902000DCCB0 /* ReportTemplate.odt */; };
@@ -6686,8 +6681,6 @@
 		841721B310D8D745001A833F /* HTTPResponse.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = HTTPResponse.m; path = cocoahttpserver/HTTPResponse.m; sourceTree = "<group>"; };
 		841721B410D8D745001A833F /* HTTPServer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = HTTPServer.h; path = cocoahttpserver/HTTPServer.h; sourceTree = "<group>"; };
 		841721B510D8D745001A833F /* HTTPServer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = HTTPServer.m; path = cocoahttpserver/HTTPServer.m; sourceTree = "<group>"; };
-		841721B610D8D745001A833F /* SSCrypto.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SSCrypto.h; path = cocoahttpserver/SSCrypto.h; sourceTree = "<group>"; };
-		841721B710D8D745001A833F /* SSCrypto.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = SSCrypto.m; path = cocoahttpserver/SSCrypto.m; sourceTree = "<group>"; };
 		841722AE10D90595001A833F /* DDKeychain.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = DDKeychain.h; path = cocoahttpserver/DDKeychain.h; sourceTree = "<group>"; };
 		841722AF10D90595001A833F /* DDKeychain.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = DDKeychain.m; path = cocoahttpserver/DDKeychain.m; sourceTree = "<group>"; };
 		841B0B3818980EFF0007E5C5 /* 3DCutRead.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = 3DCutRead.png; sourceTree = "<group>"; };
@@ -7759,8 +7752,6 @@
 		BFAEB40706BF3BEE00C7EF1E /* DCMPixelDataAttributeJPEG12.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; lineEnding = 0; path = DCMPixelDataAttributeJPEG12.m; sourceTree = "<group>"; xcLanguageSpecificationIdentifier = xcode.lang.objc; };
 		BFAEB41606BF3BFA00C7EF1E /* DCMPixelDataAttributeJPEG16.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DCMPixelDataAttributeJPEG16.h; sourceTree = "<group>"; };
 		BFAEB41706BF3BFA00C7EF1E /* DCMPixelDataAttributeJPEG16.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DCMPixelDataAttributeJPEG16.m; sourceTree = "<group>"; };
-		BFBF3A9D09B681F500545F5E /* libcrypto.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libcrypto.dylib; path = /usr/lib/libcrypto.dylib; sourceTree = "<absolute>"; };
-		BFBF3A9E09B681F500545F5E /* libssl.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libssl.dylib; path = /usr/lib/libssl.dylib; sourceTree = "<absolute>"; };
 		BFBF3A9F09B681F500545F5E /* libxml2.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libxml2.dylib; path = /usr/lib/libxml2.dylib; sourceTree = "<absolute>"; };
 		BFBF3AA009B681F500545F5E /* libz.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libz.dylib; path = /usr/lib/libz.dylib; sourceTree = "<absolute>"; };
 		BFBF3AB809B6827D00545F5E /* cfunix.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = cfunix.h; sourceTree = "<group>"; };
@@ -12234,7 +12225,6 @@
 		CEED77D7123038F300258D00 /* PapyVars3.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = PapyVars3.c; path = Papyrus3/PapyVars3.c; sourceTree = "<group>"; };
 		CEEE567C1775EB11008C6DFA /* libPapyrusToolkit.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libPapyrusToolkit.a; path = Binaries/libPapyrusToolkit.a; sourceTree = "<group>"; };
 		CEF09316182D23B20020C70A /* English */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = English; path = Binaries/English.lproj/ThumbnailsList.xib; sourceTree = "<group>"; };
-		CEF0E4BB06AEC91F001FF9E5 /* Message.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Message.framework; path = /System/Library/Frameworks/Message.framework; sourceTree = "<absolute>"; };
 		CEF0E6DA06AEF5CB001FF9E5 /* Carbon.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Carbon.framework; path = /System/Library/Frameworks/Carbon.framework; sourceTree = "<absolute>"; };
 		CEF30FD00945DEA300824A2B /* windows.tif */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; path = windows.tif; sourceTree = "<group>"; };
 		CEFB8A9810C19902000DCCB0 /* ReportTemplate.odt */ = {isa = PBXFileReference; lastKnownFileType = file; name = ReportTemplate.odt; path = Binaries/ReportTemplate.odt; sourceTree = "<group>"; };
@@ -12279,15 +12269,12 @@
 				AB28B93405B79D5C00A9906C /* ApplicationServices.framework in Frameworks */,
 				AB28B93505B79D5D00A9906C /* IOKit.framework in Frameworks */,
 				AB28B93705B79D5E00A9906C /* Accelerate.framework in Frameworks */,
-				CEF0E4BC06AEC91F001FF9E5 /* Message.framework in Frameworks */,
 				CEF0E6DC06AEF5CB001FF9E5 /* Carbon.framework in Frameworks */,
 				7E3E38660715FFDC0049E72E /* PreferencePanes.framework in Frameworks */,
 				7E54303D07A05E7100500ABB /* DiscRecording.framework in Frameworks */,
 				7E54303E07A05E7100500ABB /* DiscRecordingUI.framework in Frameworks */,
 				CE2C82EC0C708B380093C162 /* CoreVideo.framework in Frameworks */,
 				CE6693C70AF551210073D923 /* libxerces-c.27.dylib in Frameworks */,
-				BFBF3AA109B681F500545F5E /* libcrypto.dylib in Frameworks */,
-				BFBF3AA209B681F500545F5E /* libssl.dylib in Frameworks */,
 				BFBF3AA309B681F500545F5E /* libxml2.dylib in Frameworks */,
 				BFBF3AA409B681F500545F5E /* libz.dylib in Frameworks */,
 				84A205B61A1520D60005BD7D /* libCharLS.a in Frameworks */,
@@ -12504,11 +12491,8 @@
 				29B97325FDCFA39411CA2CEA /* Foundation.framework */,
 				CEA9237115CE3F7C00D3385F /* InstantMessage.framework */,
 				AB6D320C05B3159D0002F793 /* IOKit.framework */,
-				BFBF3A9D09B681F500545F5E /* libcrypto.dylib */,
-				BFBF3A9E09B681F500545F5E /* libssl.dylib */,
 				BFBF3A9F09B681F500545F5E /* libxml2.dylib */,
 				BFBF3AA009B681F500545F5E /* libz.dylib */,
-				CEF0E4BB06AEC91F001FF9E5 /* Message.framework */,
 				AB0EA93B056EDC7E004BBDD3 /* OpenGL.framework */,
 				7E3E38650715FFDC0049E72E /* PreferencePanes.framework */,
 				84321F22147E9BDA00C86CC1 /* Quartz.framework */,
@@ -12926,8 +12910,6 @@
 				841721B310D8D745001A833F /* HTTPResponse.m */,
 				841721B410D8D745001A833F /* HTTPServer.h */,
 				841721B510D8D745001A833F /* HTTPServer.m */,
-				841721B610D8D745001A833F /* SSCrypto.h */,
-				841721B710D8D745001A833F /* SSCrypto.m */,
 			);
 			name = "HTTP-HTTPS Server";
 			sourceTree = "<group>";
@@ -19551,7 +19533,6 @@
 				841722B010D90595001A833F /* DDKeychain.h in Headers */,
 				847AFE2E1A14DFA40067AA07 /* DicomStudy.h in Headers */,
 				847AFDFB1A14DFA40067AA07 /* BurnerWindowController.h in Headers */,
-				ABDB79C91117109600CC1EC5 /* SSCrypto.h in Headers */,
 				AB10FAAD11293378009EB238 /* N2Debug.h in Headers */,
 				AB10FAAF11293378009EB238 /* N2Operators.h in Headers */,
 				AB10FAB111293378009EB238 /* N2MinMax.h in Headers */,
@@ -24216,7 +24197,6 @@
 				847AFE541A14DFA40067AA07 /* DCMTKSeriesQueryNode.mm in Sources */,
 				847AFEA71A14DFA40067AA07 /* DNDArrayController.m in Sources */,
 				841721C910D8D745001A833F /* HTTPServer.m in Sources */,
-				841721CB10D8D745001A833F /* SSCrypto.m in Sources */,
 				847AFDB41A14DFA40067AA07 /* CPRClusterView.m in Sources */,
 				AB10FAAE11293378009EB238 /* N2Debug.mm in Sources */,
 				AB10FAB011293378009EB238 /* N2Operators.mm in Sources */,
@@ -26056,6 +26036,7 @@
 		7E76BEC1085757B60073649A /* Development */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_CXX_LIBRARY = "libstdc++";
 				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = "";
@@ -26082,10 +26063,6 @@
 					Binaries,
 					"\"$(SRCROOT)/Binaries\"",
 					"\"$(SRCROOT)/Binaries/KDU SDK\"",
-				);
-				OTHER_LDFLAGS = (
-					"-seg1addr",
-					0x20000000,
 				);
 				PRODUCT_NAME = OsiriX;
 				PUBLIC_HEADERS_FOLDER_PATH = "$(CONTENTS_FOLDER_PATH)/Headers";
@@ -26132,6 +26109,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_CXX_LIBRARY = "libstdc++";
 				CLANG_WARN_EMPTY_BODY = YES;
 				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = NO;
@@ -26253,10 +26231,10 @@
 					AYDicomPrint,
 				);
 				IBC_FLATTEN_NIBS = NO;
-				MACOSX_DEPLOYMENT_TARGET = 10.8;
+				MACOSX_DEPLOYMENT_TARGET = 10.10;
 				OTHER_CFLAGS = "-fvisibility=default";
 				OTHER_CODE_SIGN_FLAGS = "";
-				SDKROOT = macosx10.8;
+				VALID_ARCHS = i386;
 			};
 			name = Development;
 		};
@@ -26294,6 +26272,7 @@
 		AB724FF40ADE6ECB00A212A0 /* Development */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_CXX_LIBRARY = "libstdc++";
 				CODE_SIGN_RESOURCE_RULES_PATH = "";
 				CONFIGURATION_BUILD_DIR = "$(BUILD_DIR)/$(CONFIGURATION)";
 				COPY_PHASE_STRIP = YES;

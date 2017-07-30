@@ -1,11 +1,5 @@
 #import "DDData.h"
 
-#if TARGET_OS_IPHONE
-#import <CommonCrypto/CommonDigest.h>
-#else
-#import "SSCrypto.h"
-#endif
-
 @implementation NSData (DDData)
 
 #if TARGET_OS_IPHONE
@@ -27,7 +21,7 @@ static char encodingTable[64] = {
 	
 #else
 	
-	return [SSCrypto getMD5ForData:self];
+	return nil;
 	
 #endif
 }
@@ -43,7 +37,7 @@ static char encodingTable[64] = {
 	
 #else
 	
-	return [SSCrypto getSHA1ForData:self];
+	return nil;
 	
 #endif
 }
@@ -66,7 +60,7 @@ static char encodingTable[64] = {
 	
 #else
 	
-	return [self hexval];
+	return nil;
 	
 #endif
 }

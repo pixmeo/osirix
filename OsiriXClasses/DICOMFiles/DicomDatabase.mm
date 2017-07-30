@@ -86,7 +86,7 @@ NSString* const CurrentDatabaseVersion = @"2.5";
 }
 
 static NSString* const SqlFileName = @"Database.sql";
-NSString* const OsirixDataDirName = @"OsiriX Data";
+NSString* const OsirixDataDirName = @"OsiriX OS Data";
 NSString* const O2ScreenCapturesSeriesName = NSLocalizedString(@"OsiriX Screen Captures", nil);;
 
 +(NSString*)baseDirPathForPath:(NSString*)path {

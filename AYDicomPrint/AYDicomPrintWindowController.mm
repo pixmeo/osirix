@@ -521,7 +521,7 @@ NSString *mediumTag[] = {@"Blue Film", @"Clear Film", @"Paper"};
                     
                     NSMutableString *filmSize = [NSMutableString stringWithString: filmSizeTag[[[dict valueForKey: @"filmSizeTag"] intValue]]];
                     [filmSize replaceOccurrencesOfString: @" " withString: @"" options: 0 range: NSMakeRange(0, [filmSize length])];
-                    [filmSize replaceOccurrencesOfString: @"." withString: @"_" options: nil range: NSMakeRange(0, [filmSize length])];
+                    [filmSize replaceOccurrencesOfString: @"." withString: @"_" options: 0 range: NSMakeRange(0, [filmSize length])];
 
                     [filmbox addAttribute: [NSXMLNode attributeWithName: @"image_display_format" stringValue: [imageDisplayFormat uppercaseString]]];
                     [filmbox addAttribute: [NSXMLNode attributeWithName: @"film_orientation" stringValue: [filmOrientationTag[[[dict valueForKey: @"filmOrientationTag"] intValue]] uppercaseString]]];

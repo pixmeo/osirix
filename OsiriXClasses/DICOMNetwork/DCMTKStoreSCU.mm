@@ -977,29 +977,29 @@ static OFCondition cstore(T_ASC_Association * assoc, const OFString& fname)
 		_cipherSuites = nil;
 		_dhparam = NULL;
 		
-		if (_secureConnection)
-		{
-			_doAuthenticate = [[extraParameters objectForKey:@"TLSAuthenticated"] boolValue];
-			_keyFileFormat = SSL_FILETYPE_PEM;
-			certVerification = (TLSCertificateVerificationType)[[extraParameters objectForKey:@"TLSCertificateVerification"] intValue];
-			
-			NSArray *suites = [extraParameters objectForKey:@"TLSCipherSuites"];
-			NSMutableArray *selectedCipherSuites = [NSMutableArray array];
-			
-			for (NSDictionary *suite in suites)
-			{
-				if ([[suite objectForKey:@"Supported"] boolValue])
-					[selectedCipherSuites addObject:[suite objectForKey:@"Cipher"]];
-			}
-			
-			_cipherSuites = [[NSArray arrayWithArray:selectedCipherSuites] retain];
-			
-			if([[extraParameters objectForKey:@"TLSUseDHParameterFileURL"] boolValue])
-				_dhparam = [[extraParameters objectForKey:@"TLSDHParameterFileURL"] cStringUsingEncoding:NSUTF8StringEncoding];
-			
-			_readSeedFile = [TLS_SEED_FILE cStringUsingEncoding:NSUTF8StringEncoding];
-			_writeSeedFile = TLS_WRITE_SEED_FILE;
-		}
+//		if (_secureConnection)
+//		{
+//			_doAuthenticate = [[extraParameters objectForKey:@"TLSAuthenticated"] boolValue];
+//			_keyFileFormat = SSL_FILETYPE_PEM;
+//			certVerification = (TLSCertificateVerificationType)[[extraParameters objectForKey:@"TLSCertificateVerification"] intValue];
+//			
+//			NSArray *suites = [extraParameters objectForKey:@"TLSCipherSuites"];
+//			NSMutableArray *selectedCipherSuites = [NSMutableArray array];
+//			
+//			for (NSDictionary *suite in suites)
+//			{
+//				if ([[suite objectForKey:@"Supported"] boolValue])
+//					[selectedCipherSuites addObject:[suite objectForKey:@"Cipher"]];
+//			}
+//			
+//			_cipherSuites = [[NSArray arrayWithArray:selectedCipherSuites] retain];
+//			
+//			if([[extraParameters objectForKey:@"TLSUseDHParameterFileURL"] boolValue])
+//				_dhparam = [[extraParameters objectForKey:@"TLSDHParameterFileURL"] cStringUsingEncoding:NSUTF8StringEncoding];
+//			
+//			_readSeedFile = [TLS_SEED_FILE cStringUsingEncoding:NSUTF8StringEncoding];
+//			_writeSeedFile = TLS_WRITE_SEED_FILE;
+//		}
 		
 		_filesToSend = [[NSMutableArray arrayWithArray: filesToSend] retain];
 		[_filesToSend removeDuplicatedStrings];
@@ -1244,7 +1244,7 @@ static OFCondition cstore(T_ASC_Association * assoc, const OFString& fname)
 	//opt_maxSendPDULength = 
 	//dcmMaxOutgoingPDUSize.set((Uint32)opt_maxSendPDULength);
 	
-	DcmTLSTransportLayer *tLayer = NULL;
+	//DcmTLSTransportLayer *tLayer = NULL;
 	
 	#ifndef OSIRIX_LIGHT
 //	if( _secureConnection)
