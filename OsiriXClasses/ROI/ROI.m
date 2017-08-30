@@ -1327,6 +1327,19 @@ int spline( NSPoint *Pt, int tot, NSPoint **newPt, long **correspondingSegmentPt
         if( fileVersion >= 15)
             zLocation = [[coder decodeObject] doubleValue];
         
+        if( fileVersion >= 16)
+        {
+            textualBoxLine6 = [[coder decodeObject] retain];
+            textualBoxLine7 = [[coder decodeObject] retain];
+            textualBoxLine8 = [[coder decodeObject] retain];
+            NSString *textualBoxLine9 = [coder decodeObject];
+        }
+        
+        if( fileVersion >= 17) {
+            NSArray *stringTags = [coder decodeObject];
+            BOOL dontDisplayInKeyImagesWindow = [coder decodeObject];
+        }
+        
 		[points retain];
 		[name retain];
 		[comments retain];
