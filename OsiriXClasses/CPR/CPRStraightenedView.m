@@ -29,6 +29,7 @@
 #import "StringTexture.h"
 #import "NSColor+N2.h"
 #import <objc/runtime.h>
+//#import "DCMView.h"
 
 extern BOOL frameZoomed;
 extern int splitPosition[ 3];

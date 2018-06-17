@@ -19,10 +19,13 @@ static OSStatus SSLSecPolicyCopy(SecPolicyRef *ret_policy)
 	*ret_policy = NULL;
 	status = SecPolicySearchCreate(CSSM_CERT_X_509v3, &CSSMOID_APPLE_TP_SSL, NULL, &policy_search);
 	//status = SecPolicySearchCreate(CSSM_CERT_X_509v3, &CSSMOID_APPLE_X509_BASIC, NULL, &policy_search);
-	__Require_noErr(status, SecPolicySearchCreate);
+    //require_noerr(status, SecPolicySearchCopyNext);
+    // comment out for build require_noerr by air
+    __Require_noErr(status, SecPolicySearchCreate);
 	
 	status = SecPolicySearchCopyNext(policy_search, &policy);
-	require_noerr(status, SecPolicySearchCopyNext);
+	//require_noerr(status, SecPolicySearchCopyNext);
+    __Require_noErr(status, SecPolicySearchCreate);
 	
 	*ret_policy = policy;
 	
