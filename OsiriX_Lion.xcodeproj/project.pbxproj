@@ -6470,6 +6470,56 @@
 
 /* Begin PBXFileReference section */
 		1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = /System/Library/Frameworks/Cocoa.framework; sourceTree = "<absolute>"; };
+		20C0D2C220D5DE4B00569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/DiscMountedAskTheUserDialog.xib; sourceTree = "<group>"; };
+		20C0D2C320D5DE5400569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/iChatHelper.xib; sourceTree = "<group>"; };
+		20C0D2C420D5DE5C00569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/3DPosition.xib; sourceTree = "<group>"; };
+		20C0D2C520D5DE6400569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/AnonymizationCustomTagPanel.xib; sourceTree = "<group>"; };
+		20C0D2C620D5DE6E00569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/AnonymizationPanel.xib; sourceTree = "<group>"; };
+		20C0D2C720D5DE7500569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/AnonymizationSavePanel.xib; sourceTree = "<group>"; };
+		20C0D2C820D5DE7E00569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/AnonymizationTemplateNamePanel.xib; sourceTree = "<group>"; };
+		20C0D2C920D5DE8800569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/AnonymizationView.xib; sourceTree = "<group>"; };
+		20C0D2CA20D5DE9000569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/AYDicomPrint.xib; sourceTree = "<group>"; };
+		20C0D2CB20D5DE9A00569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/BurnViewer.xib; sourceTree = "<group>"; };
+		20C0D2CC20D5DEA200569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/CalciumScoring.xib; sourceTree = "<group>"; };
+		20C0D2CD20D5DEAC00569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/CPR.xib; sourceTree = "<group>"; };
+		20C0D2CE20D5DEB600569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/CustomIntervalPanel.xib; sourceTree = "<group>"; };
+		20C0D2CF20D5DEC000569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/Endoscopy.xib; sourceTree = "<group>"; };
+		20C0D2D020D5DEC900569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/FlyThru.xib; sourceTree = "<group>"; };
+		20C0D2D120D5DED200569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/Histogram.xib; sourceTree = "<group>"; };
+		20C0D2D220D5DEDB00569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/ITKSegmentation.xib; sourceTree = "<group>"; };
+		20C0D2D320D5DEE500569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/LogWindow.xib; sourceTree = "<group>"; };
+		20C0D2D420D5DEEE00569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/Loupe.xib; sourceTree = "<group>"; };
+		20C0D2D520D5DEF900569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/MainMenu.xib; sourceTree = "<group>"; };
+		20C0D2D620D5DF0100569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/MPR.xib; sourceTree = "<group>"; };
+		20C0D2D720D5DF0A00569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/Navigator.xib; sourceTree = "<group>"; };
+		20C0D2D820D5DF1300569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/OrthogonalMPR.xib; sourceTree = "<group>"; };
+		20C0D2D920D5DF1B00569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/PaletteBrush.xib; sourceTree = "<group>"; };
+		20C0D2DA20D5DF2400569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/PETCT.xib; sourceTree = "<group>"; };
+		20C0D2DB20D5DF2F00569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/Plot.xib; sourceTree = "<group>"; };
+		20C0D2DC20D5DF3B00569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/PluginManager.xib; sourceTree = "<group>"; };
+		20C0D2DD20D5DF4700569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/PreferencesWindow.xib; sourceTree = "<group>"; };
+		20C0D2DE20D5DF5500569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/Query.xib; sourceTree = "<group>"; };
+		20C0D2DF20D5DF5F00569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/QuicktimeExport.xib; sourceTree = "<group>"; };
+		20C0D2E020D5DF6800569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/ROI.xib; sourceTree = "<group>"; };
+		20C0D2E120D5DF7200569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/ROIDefaults.xib; sourceTree = "<group>"; };
+		20C0D2E220D5DF7A00569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/ROIManager.xib; sourceTree = "<group>"; };
+		20C0D2E320D5DF8200569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/ROIVolume.xib; sourceTree = "<group>"; };
+		20C0D2E420D5DF9000569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/ROIVolumeManager.xib; sourceTree = "<group>"; };
+		20C0D2E520D5DF9900569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/Send.xib; sourceTree = "<group>"; };
+		20C0D2E620D5DFA200569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/SmartAlbum.xib; sourceTree = "<group>"; };
+		20C0D2E720D5DFAB00569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/Splash.xib; sourceTree = "<group>"; };
+		20C0D2E820D5DFB400569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/SR.xib; sourceTree = "<group>"; };
+		20C0D2E920D5DFBD00569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/ThickSlab.xib; sourceTree = "<group>"; };
+		20C0D2EA20D5DFC600569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/ThreadModalForWindow.xib; sourceTree = "<group>"; };
+		20C0D2EB20D5DFD500569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/ThumbnailsList.xib; sourceTree = "<group>"; };
+		20C0D2EC20D5DFE000569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/ToolbarPanel.xib; sourceTree = "<group>"; };
+		20C0D2ED20D5DFEB00569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/Viewer.xib; sourceTree = "<group>"; };
+		20C0D2EE20D5DFF600569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/VR.xib; sourceTree = "<group>"; };
+		20C0D2EF20D5E00000569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/Wait.xib; sourceTree = "<group>"; };
+		20C0D2F020D5E00A00569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/WaitRendering.xib; sourceTree = "<group>"; };
+		20C0D2F120D5E01300569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = ja; path = Binaries/ja.lproj/XMLViewer.xib; sourceTree = "<group>"; };
+		20C0D2F220D5E01D00569F76 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = Binaries/ja.lproj/Localizable.strings; sourceTree = "<group>"; };
+		20D426AD20D3951D00C180EB /* DCMView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = DCMView.h; path = OsiriXClasses/2D/DCMView.h; sourceTree = "<group>"; };
 		29B97324FDCFA39411CA2CEA /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = /System/Library/Frameworks/AppKit.framework; sourceTree = "<absolute>"; };
 		29B97325FDCFA39411CA2CEA /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = /System/Library/Frameworks/Foundation.framework; sourceTree = "<absolute>"; };
 		4F4FAD451A9118B300B2EDFC /* OSIDerivedROI.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OSIDerivedROI.h; sourceTree = "<group>"; };
@@ -12534,6 +12584,7 @@
 		29B97314FDCFA39411CA2CEA /* OsiriX */ = {
 			isa = PBXGroup;
 			children = (
+				20D426AD20D3951D00C180EB /* DCMView.h */,
 				AB451801149F44DD006674BF /* JPEG-LS (CharLS) */,
 				84A9D44712F7F8BE00DA1F99 /* KDU SDK */,
 				AB10FA9611293361009EB238 /* Nitrogen */,
@@ -19064,6 +19115,7 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				847AFCD71A14DFA30067AA07 /* DCMView.h in Headers */,
 				AB28B8D705B79D1500A9906C /* NSFont_OpenGL.h in Headers */,
 				ABDE6E1906398E3400F0C5DD /* port.h in Headers */,
 				ABDE6E1A06398E3400F0C5DD /* t4.h in Headers */,
@@ -21107,7 +21159,6 @@
 				847AFE2A1A14DFA40067AA07 /* DicomSeries.h in Headers */,
 				CEBD8BF314F1ADDA000DA1FE /* vtkDummyCommunicator.h in Headers */,
 				CEBD8BF414F1ADDA000DA1FE /* vtkDummyController.h in Headers */,
-				847AFCD71A14DFA30067AA07 /* DCMView.h in Headers */,
 				CEBD8BF514F1ADDA000DA1FE /* vtkDummyGPUInfoList.h in Headers */,
 				CEBD8BF614F1ADDA000DA1FE /* vtkDuplicatePolyData.h in Headers */,
 				CEBD8BF714F1ADDA000DA1FE /* vtkDynamic2DLabelMapper.h in Headers */,
@@ -23384,16 +23435,12 @@
 				French,
 				German,
 				zh_CN,
-				da,
 				Dutch,
-				fi,
 				Italian,
-				ko,
 				no,
-				pt,
 				Spanish,
-				sv,
 				zh_TW,
+				ja,
 			);
 			mainGroup = 29B97314FDCFA39411CA2CEA /* OsiriX */;
 			projectDirPath = "";
@@ -25522,6 +25569,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				5926822211CF60BD00CFA81F /* English */,
+				20C0D2EA20D5DFC600569F76 /* ja */,
 			);
 			name = ThreadModalForWindow.xib;
 			sourceTree = "<group>";
@@ -25530,6 +25578,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				5997897211B7B423002DB107 /* English */,
+				20C0D2C520D5DE6400569F76 /* ja */,
 			);
 			name = AnonymizationCustomTagPanel.xib;
 			sourceTree = "<group>";
@@ -25538,6 +25587,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				5997897411B7B423002DB107 /* English */,
+				20C0D2C620D5DE6E00569F76 /* ja */,
 			);
 			name = AnonymizationPanel.xib;
 			sourceTree = "<group>";
@@ -25546,6 +25596,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				5997897611B7B423002DB107 /* English */,
+				20C0D2C720D5DE7500569F76 /* ja */,
 			);
 			name = AnonymizationSavePanel.xib;
 			sourceTree = "<group>";
@@ -25554,6 +25605,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				5997897811B7B423002DB107 /* English */,
+				20C0D2C820D5DE7E00569F76 /* ja */,
 			);
 			name = AnonymizationTemplateNamePanel.xib;
 			sourceTree = "<group>";
@@ -25562,6 +25614,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				5997897A11B7B423002DB107 /* English */,
+				20C0D2C920D5DE8800569F76 /* ja */,
 			);
 			name = AnonymizationView.xib;
 			sourceTree = "<group>";
@@ -25570,6 +25623,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				59BDF105117EE61E007F1F2C /* English */,
+				20C0D2DD20D5DF4700569F76 /* ja */,
 			);
 			name = PreferencesWindow.xib;
 			sourceTree = "<group>";
@@ -25578,6 +25632,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				71512E98152349E500B87012 /* English */,
+				20C0D2C220D5DE4B00569F76 /* ja */,
 			);
 			name = DiscMountedAskTheUserDialog.xib;
 			sourceTree = "<group>";
@@ -25586,6 +25641,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				848327AA15ED08F3003BAEEB /* English */,
+				20C0D2CE20D5DEB600569F76 /* ja */,
 			);
 			name = CustomIntervalPanel.xib;
 			sourceTree = "<group>";
@@ -25594,6 +25650,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				A9333D390F56E9670097DAB7 /* English */,
+				20C0D2D620D5DF0100569F76 /* ja */,
 			);
 			name = MPR.xib;
 			sourceTree = "<group>";
@@ -25602,6 +25659,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				A987B3E00D5A069200BF89C0 /* English */,
+				20C0D2D720D5DF0A00569F76 /* ja */,
 			);
 			name = Navigator.xib;
 			sourceTree = "<group>";
@@ -25610,6 +25668,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				A9C4D9460F72987900B5B9A1 /* English */,
+				20C0D2D420D5DEEE00569F76 /* ja */,
 			);
 			name = Loupe.xib;
 			sourceTree = "<group>";
@@ -25618,6 +25677,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				ABE0D6930CDB1A4400F0494B /* English */,
+				20C0D2C320D5DE5400569F76 /* ja */,
 			);
 			name = iChatHelper.xib;
 			sourceTree = "<group>";
@@ -25626,6 +25686,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE286C110964196C001A4573 /* English */,
+				20C0D2F220D5E01D00569F76 /* ja */,
 			);
 			name = Localizable.strings;
 			sourceTree = "<group>";
@@ -25634,6 +25695,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE2AC2671830BEFB00C2B67B /* English */,
+				20C0D2E920D5DFBD00569F76 /* ja */,
 			);
 			name = ThickSlab.xib;
 			sourceTree = "<group>";
@@ -25642,6 +25704,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F98E50C84724B00CB38F1 /* English */,
+				20C0D2E620D5DFA200569F76 /* ja */,
 			);
 			name = SmartAlbum.xib;
 			sourceTree = "<group>";
@@ -25650,6 +25713,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F98E70C84724B00CB38F1 /* English */,
+				20C0D2E420D5DF9000569F76 /* ja */,
 			);
 			name = ROIVolumeManager.xib;
 			sourceTree = "<group>";
@@ -25658,6 +25722,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F98E90C84724B00CB38F1 /* English */,
+				20C0D2DA20D5DF2400569F76 /* ja */,
 			);
 			name = PETCT.xib;
 			sourceTree = "<group>";
@@ -25666,6 +25731,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F98EB0C84724B00CB38F1 /* English */,
+				20C0D2D320D5DEE500569F76 /* ja */,
 			);
 			name = LogWindow.xib;
 			sourceTree = "<group>";
@@ -25674,6 +25740,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F98ED0C84724B00CB38F1 /* English */,
+				20C0D2D020D5DEC900569F76 /* ja */,
 			);
 			name = FlyThru.xib;
 			sourceTree = "<group>";
@@ -25682,6 +25749,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F98F10C84724B00CB38F1 /* English */,
+				20C0D2EC20D5DFE000569F76 /* ja */,
 			);
 			name = ToolbarPanel.xib;
 			sourceTree = "<group>";
@@ -25690,6 +25758,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F98FD0C84724B00CB38F1 /* English */,
+				20C0D2E720D5DFAB00569F76 /* ja */,
 			);
 			name = Splash.xib;
 			sourceTree = "<group>";
@@ -25698,6 +25767,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F98FF0C84724B00CB38F1 /* English */,
+				20C0D2E020D5DF6800569F76 /* ja */,
 			);
 			name = ROI.xib;
 			sourceTree = "<group>";
@@ -25706,6 +25776,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F99010C84724B00CB38F1 /* English */,
+				20C0D2CC20D5DEA200569F76 /* ja */,
 			);
 			name = CalciumScoring.xib;
 			sourceTree = "<group>";
@@ -25714,6 +25785,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F99030C84724B00CB38F1 /* English */,
+				20C0D2E220D5DF7A00569F76 /* ja */,
 			);
 			name = ROIManager.xib;
 			sourceTree = "<group>";
@@ -25722,6 +25794,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F99050C84724B00CB38F1 /* English */,
+				20C0D2E520D5DF9900569F76 /* ja */,
 			);
 			name = Send.xib;
 			sourceTree = "<group>";
@@ -25730,6 +25803,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F99070C84724B00CB38F1 /* English */,
+				20C0D2D820D5DF1300569F76 /* ja */,
 			);
 			name = OrthogonalMPR.xib;
 			sourceTree = "<group>";
@@ -25738,6 +25812,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F990B0C84724B00CB38F1 /* English */,
+				20C0D2CF20D5DEC000569F76 /* ja */,
 			);
 			name = Endoscopy.xib;
 			sourceTree = "<group>";
@@ -25746,6 +25821,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F99110C84724B00CB38F1 /* English */,
+				20C0D2D220D5DEDB00569F76 /* ja */,
 			);
 			name = ITKSegmentation.xib;
 			sourceTree = "<group>";
@@ -25754,6 +25830,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F99130C84724B00CB38F1 /* English */,
+				20C0D2DE20D5DF5500569F76 /* ja */,
 			);
 			name = Query.xib;
 			sourceTree = "<group>";
@@ -25762,6 +25839,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F99150C84724B00CB38F1 /* English */,
+				20C0D2D120D5DED200569F76 /* ja */,
 			);
 			name = Histogram.xib;
 			sourceTree = "<group>";
@@ -25770,6 +25848,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F99170C84724B00CB38F1 /* English */,
+				20C0D2DC20D5DF3B00569F76 /* ja */,
 			);
 			name = PluginManager.xib;
 			sourceTree = "<group>";
@@ -25778,6 +25857,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F991B0C84724B00CB38F1 /* English */,
+				20C0D2F020D5E00A00569F76 /* ja */,
 			);
 			name = WaitRendering.xib;
 			sourceTree = "<group>";
@@ -25786,6 +25866,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F991D0C84724B00CB38F1 /* English */,
+				20C0D2DB20D5DF2F00569F76 /* ja */,
 			);
 			name = Plot.xib;
 			sourceTree = "<group>";
@@ -25794,6 +25875,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F991F0C84724B00CB38F1 /* English */,
+				20C0D2E320D5DF8200569F76 /* ja */,
 			);
 			name = ROIVolume.xib;
 			sourceTree = "<group>";
@@ -25802,6 +25884,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F99270C84724B00CB38F1 /* English */,
+				20C0D2D920D5DF1B00569F76 /* ja */,
 			);
 			name = PaletteBrush.xib;
 			sourceTree = "<group>";
@@ -25810,6 +25893,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F992D0C84724B00CB38F1 /* English */,
+				20C0D2CB20D5DE9A00569F76 /* ja */,
 			);
 			name = BurnViewer.xib;
 			sourceTree = "<group>";
@@ -25818,6 +25902,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F992F0C84724B00CB38F1 /* English */,
+				20C0D2E120D5DF7200569F76 /* ja */,
 			);
 			name = ROIDefaults.xib;
 			sourceTree = "<group>";
@@ -25826,6 +25911,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F99310C84724B00CB38F1 /* English */,
+				20C0D2EE20D5DFF600569F76 /* ja */,
 			);
 			name = VR.xib;
 			sourceTree = "<group>";
@@ -25834,6 +25920,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F99330C84724B00CB38F1 /* English */,
+				20C0D2DF20D5DF5F00569F76 /* ja */,
 			);
 			name = QuicktimeExport.xib;
 			sourceTree = "<group>";
@@ -25842,6 +25929,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F99350C84724B00CB38F1 /* English */,
+				20C0D2E820D5DFB400569F76 /* ja */,
 			);
 			name = SR.xib;
 			sourceTree = "<group>";
@@ -25850,6 +25938,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F99370C84724B00CB38F1 /* English */,
+				20C0D2ED20D5DFEB00569F76 /* ja */,
 			);
 			name = Viewer.xib;
 			sourceTree = "<group>";
@@ -25858,6 +25947,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F99390C84724B00CB38F1 /* English */,
+				20C0D2D520D5DEF900569F76 /* ja */,
 			);
 			name = MainMenu.xib;
 			sourceTree = "<group>";
@@ -25866,6 +25956,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F993B0C84724B00CB38F1 /* English */,
+				20C0D2EF20D5E00000569F76 /* ja */,
 			);
 			name = Wait.xib;
 			sourceTree = "<group>";
@@ -25874,6 +25965,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F993F0C84724B00CB38F1 /* English */,
+				20C0D2F120D5E01300569F76 /* ja */,
 			);
 			name = XMLViewer.xib;
 			sourceTree = "<group>";
@@ -25882,6 +25974,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE3F99410C84724B00CB38F1 /* English */,
+				20C0D2CA20D5DE9000569F76 /* ja */,
 			);
 			name = AYDicomPrint.xib;
 			sourceTree = "<group>";
@@ -25890,6 +25983,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE40ED580D86D634007C6D49 /* English */,
+				20C0D2C420D5DE5C00569F76 /* ja */,
 			);
 			name = 3DPosition.xib;
 			sourceTree = "<group>";
@@ -25898,6 +25992,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CE90551712F5B68100263AB6 /* English */,
+				20C0D2CD20D5DEAC00569F76 /* ja */,
 			);
 			name = CPR.xib;
 			sourceTree = "<group>";
@@ -26026,6 +26121,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				CEF09316182D23B20020C70A /* English */,
+				20C0D2EB20D5DFD500569F76 /* ja */,
 			);
 			name = ThumbnailsList.xib;
 			sourceTree = "<group>";
@@ -26162,6 +26258,7 @@
 					"-no-pedantic",
 				);
 				PRODUCT_NAME = "OsiriX-OS";
+				SDKROOT = macosx10.13;
 				USER_HEADER_SEARCH_PATHS = "ITK180/Modules/Core/Common/include ITK180/Modules/ThirdParty/VNL/src/vxl/core ITK180/Modules/ThirdParty/VNL/src/vxl/vcl ITK180/Modules/Core/Common ITK180/Modules/Core/Mesh/include ITK180/Modules/Segmentation/RegionGrowing/include ITK180/Modules/Filtering/CurvatureFlow/include ITK180/Modules/Core/ImageFunction/include ITK180/Modules/Core/FiniteDifference/include ITK180/Modules/Filtering/ImageFilterBase/include ITK180/Modules/Segmentation/LevelSets/include ITK180/Modules/Filtering/FastMarching/include ITK180/Modules/Filtering/ImageIntensity/include ITK180/Modules/Bridge/VTK/include ITK180/Modules/Filtering/MathematicalMorphology/include ITK180/Modules/Core/Transform/include ITK180/Modules/Filtering/ImageGrid/include ITK180/Modules/Filtering/BinaryMathematicalMorphology/include ITK180/Modules/ThirdParty/NrrdIO/src/NrrdIO";
 				WARNING_CFLAGS = "-no-pedantic";
 			};
@@ -26205,6 +26302,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_LINK_OBJC_RUNTIME = NO;
 				CLANG_WARN_BOOL_CONVERSION = YES;
 				CLANG_WARN_CONSTANT_CONVERSION = YES;

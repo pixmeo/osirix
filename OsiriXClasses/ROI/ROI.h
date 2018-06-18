@@ -14,6 +14,7 @@
 
 #import <Foundation/Foundation.h>
 #import "MyPoint.h"
+#import "DCMView.h"//ToolMode is here
 
 #import <OpenGL/CGLMacro.h>
 
@@ -52,9 +53,13 @@ typedef enum regionCode_
 
 // WARNING: If you add or modify this list, check ViewerController.m, DCMView.h and HotKey Pref Pane
 
-typedef enum ToolMode_
+
+//typedef enum ToolMode_
+/*typedef NS_ENUM(short, ToolMode)//modify by air
+typedef enum
 {
     tIdle                       =   -1,
+    
     tWL							=	0,
     tTranslate,					//	1
     tZoom,						//	2
@@ -74,6 +79,7 @@ typedef enum ToolMode_
 	t3Dpoint,					//	16
 	t3DCut,						//	17
 	tCamera3D,					//	18
+    
 	t2DPoint,					//	19
 	tPlain,						//	20
 	tBonesRemoval,				//	21
@@ -87,7 +93,8 @@ typedef enum ToolMode_
     tTAGT,                      //  29
     tBall,                      //  30
     tOvalAngle                  //  31
-} ToolMode;
+}ToolMode;*/
+
 
 @class DCMView;
 @class DCMPix;
@@ -233,7 +240,7 @@ typedef enum ToolMode_
 @property(nonatomic) float opacity, zLocation;
 @property(nonatomic) int originalIndexForAlias;
 @property(nonatomic) BOOL hidden, locked, selectable, is3DROI;
-@property BOOL isAliased, displayCMOrPixels, mouseOverROI;
+@property(readwrite) BOOL isAliased, displayCMOrPixels, mouseOverROI;
 @property(nonatomic, copy) NSString *name;
 @property(retain) NSString *comments;
 @property ToolMode type;
@@ -242,7 +249,7 @@ typedef enum ToolMode_
 @property(readonly) NSMutableArray *zPositions;
 @property BOOL clickInTextBox;
 @property(nonatomic, setter=setROIRect:) NSRect rect; // To create a Rectangular ROI (tROI) or an Oval ROI (tOval) or a 2DPoint
-@property(nonatomic, retain) DCMPix *pix; // The DCMPix associated to this ROI
+@property(nonatomic,readwrite, retain) DCMPix *pix; // The DCMPix associated to this ROI  change by air
 @property(assign, nonatomic) DCMView *curView;  // The DCMView associated to this ROI
 @property float mousePosMeasure;
 @property(readonly) NSData *data;

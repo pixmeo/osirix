@@ -22,7 +22,7 @@
 #include <OpenGL/CGLCurrent.h>
 #include <OpenGL/CGLContext.h>
 #import "N3Geometry.h"
-#import "ROI.h"
+//#import "ROI.h"
 
 #define STAT_UPDATE					0.6f
 #define IMAGE_COUNT					1
@@ -40,6 +40,49 @@ enum { barHide = 0, barOrigin, barFused, barBoth };
 enum { syncroOFF = 0, syncroABS = 1, syncroREL = 2, syncroLOC = 3, syncroRatio = 4};
 
 typedef enum {DCMViewTextAlignLeft, DCMViewTextAlignCenter, DCMViewTextAlignRight} DCMViewTextAlign;
+
+//add by air
+//typedef NS_ENUM(short, ToolMode)//modify by air
+typedef enum
+{
+    tIdle                       =   -1,
+    
+    tWL                            =    0,
+    tTranslate,                    //    1
+    tZoom,                        //    2
+    tRotate,                    //    3
+    tNext,                        //    4
+    tMesure,                    //    5
+    tROI,                        //    6
+    t3DRotate,                    //    7
+    tCross,                        //    8
+    tOval,                        //    9
+    tOPolygon,                    //    10
+    tCPolygon,                    //    11
+    tAngle ,                    //    12
+    tText,                        //    13
+    tArrow,                        //    14
+    tPencil,                    //    15
+    t3Dpoint,                    //    16
+    t3DCut,                        //    17
+    tCamera3D,                    //    18
+    
+    t2DPoint,                    //    19
+    tPlain,                        //    20
+    tBonesRemoval,                //    21
+    tWLBlended,                    //  22
+    tRepulsor,                    //  23
+    tLayerROI,                    //    24
+    tROISelector,                //    25
+    tAxis,                        //    26
+    tDynAngle,                    //    27
+    tCurvedROI,                    //    28
+    tTAGT,                      //  29
+    tBall,                      //  30
+    tOvalAngle                  //  31
+}ToolMode;
+
+
 
 @class GLString;
 @class DCMPix;
