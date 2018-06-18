@@ -24,8 +24,7 @@ static OSStatus SSLSecPolicyCopy(SecPolicyRef *ret_policy)
     __Require_noErr(status, SecPolicySearchCreate);
 	
 	status = SecPolicySearchCopyNext(policy_search, &policy);
-	//require_noerr(status, SecPolicySearchCopyNext);
-    __Require_noErr(status, SecPolicySearchCopyNext);
+	__Require_noErr(status, SecPolicySearchCopyNext);
 	
 	*ret_policy = policy;
 	
