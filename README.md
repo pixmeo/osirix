@@ -1,8 +1,8 @@
-# osirix
-## OsiriX Lite DICOM Viewer Japanese Version  
-  
-  
-###
+# OsiriX
+## OsiriX open-source version
 
+More informations about this software on our web site:
+
+https://www.osirix-viewer.com
 
 
