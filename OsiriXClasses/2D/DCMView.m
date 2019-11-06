@@ -8277,6 +8277,9 @@ NSInteger studyCompare(ViewerController *v1, ViewerController *v2, void *context
 	glScalef (2.0f / size.size.width, -2.0f /  size.size.height, 1.0f); // scale to port per pixel scale
 	glTranslatef (-(size.size.width) / 2.0f, -(size.size.height) / 2.0f, 0.0f); // translate center to upper left
 	
+    if( cgl_ctx.graphicChipSet == GL_AMD)
+        glTexParameteri (GL_AMD_INVERTED_TEXTURE, 2, GL_AMD_STORAGE);
+    
 	//draw line around edge for key Images only in 2D Viewer
 	
 	if ([self isKeyImage] && stringID == nil)
